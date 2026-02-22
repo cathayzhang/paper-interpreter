@@ -158,7 +158,7 @@ def process_paper(url: str, illustration_count: int):
             # Step 2: 提取内容
             status_text.text("📄 正在提取论文内容...")
             extractor = PDFExtractor()
-            paper_content = extractor.extract(pdf_path)
+            paper_content = extractor.extract(pdf_path, metadata)
             progress_bar.progress(30)
 
             # Step 3: 分析
