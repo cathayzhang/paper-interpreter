@@ -103,7 +103,7 @@ def process_paper(url: str, illustration_count: int):
             # Step 1: 下载
             status_text.text("📥 正在下载论文...")
             downloader = PaperDownloader()
-            pdf_path = downloader.download(url, output_dir)
+            pdf_path, metadata = downloader.download(url, output_dir)
 
             if not pdf_path:
                 st.error("❌ 论文下载失败，请检查链接是否可访问")
