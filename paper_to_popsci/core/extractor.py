@@ -269,11 +269,21 @@ class PDFExtractor:
 
         # 提取机构信息（从第一页或作者注释）
         if not content.institution and content.raw_text:
-            # 尝试匹配常见的机构格式
-            inst_match = re.search(r'(?i)(?:^|\n)([^\n]*?(?:university|college|institute|lab)[^\n]*)',
-                                   content.raw_text[:2000])
-            if inst_match:
-                content.institution = self._clean_text(inst_match.group(1))
+            # 尝试匹配常见的机构格式（支持中英文）
+            patterns = [
+                r'(?i)([^\n]*?(?:university|college|institute|laboratory|lab|研究所|大学|学院)[^\n]{0,50})',
+                r'(?i)([^\n]*?(?:dept\.|department)[^\n]{0,50})',
+                r'(?i)([^\n]*?(?:school of)[^\n]{0,50})',
+            ]
+            
+            for pattern in patterns:
+                inst_match = re.search(pattern, content.raw_text[:2000])
+                if inst_match:
+                    institution = self._clean_text(inst_match.group(1))
+                    # 过滤掉太短或太长的结果
+                    if 5 < len(institution) < 100:
+                        content.institution = institution
+                        break
 
         return content
 
