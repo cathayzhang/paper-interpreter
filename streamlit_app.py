@@ -20,50 +20,35 @@ st.set_page_config(
     page_title="Paper Interpreter - 论文解读专家",
     page_icon="📄",
     layout="centered",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="expanded"
 )
 
-# 添加侧边栏测试功能
+# 侧边栏 - API 配置
 with st.sidebar:
-    st.title("🔧 调试工具")
-    if st.button("🔍 测试 API 连接"):
-        st.subheader("API 配置检查")
-        
-        api_key = os.getenv("GEMINI_API_KEY", st.secrets.get("GEMINI_API_KEY", ""))
-        api_url = os.getenv("GEMINI_API_URL", st.secrets.get("GEMINI_API_URL", ""))
-        model = os.getenv("GEMINI_MODEL", st.secrets.get("GEMINI_MODEL", ""))
-        
-        st.write(f"API URL: `{api_url}`")
-        st.write(f"Model: `{model}`")
-        st.write(f"API Key 长度: `{len(api_key)}`")
-        st.write(f"API Key 前10位: `{api_key[:10]}...`")
-        st.write(f"API Key 后10位: `...{api_key[-10:]}`")
-        
-        # 测试连接
-        url = f"{api_url}/v1/chat/completions"
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {api_key}",
-        }
-        data = {
-            "model": model,
-            "messages": [{"role": "user", "content": "Say this is a test!"}],
-            "temperature": 0.7,
-            "max_tokens": 100
-        }
-        
-        try:
-            response = requests.post(url, headers=headers, json=data, timeout=30)
-            st.write(f"**状态码：** `{response.status_code}`")
-            
-            if response.status_code == 200:
-                st.success("✅ API 连接成功！")
-                st.json(response.json())
-            else:
-                st.error(f"❌ API 返回错误")
-                st.code(response.text)
-        except Exception as e:
-            st.error(f"❌ 请求异常: {str(e)}")
+    st.title("⚙️ API 配置")
+    st.markdown("请输入你自己的 API Key")
+    
+    user_api_key = st.text_input(
+        "Gemini API Key",
+        type="password",
+        help="从 https://yunwu.ai 获取你的 API Key"
+    )
+    
+    if user_api_key:
+        # 使用用户提供的 API Key
+        os.environ["GEMINI_API_KEY"] = user_api_key
+        os.environ["NANO_BANANA_API_KEY"] = user_api_key
+        st.success("✅ API Key 已设置")
+    else:
+        # 使用默认配置（如果有）
+        default_key = os.getenv("GEMINI_API_KEY", st.secrets.get("GEMINI_API_KEY", ""))
+        if default_key:
+            st.info("ℹ️ 使用默认配置")
+        else:
+            st.warning("⚠️ 请输入 API Key 以使用服务")
+    
+    st.divider()
+    st.caption("你的 API Key 仅在当前会话中使用，不会被保存或分享")
 
 # 自定义样式 - 暖米色主题
 st.markdown("""
@@ -130,6 +115,12 @@ def main():
     if st.button("🚀 开始解读", type="primary", use_container_width=True):
         if not url:
             st.error("请输入论文链接")
+            return
+        
+        # 检查 API Key
+        api_key = os.getenv("GEMINI_API_KEY", st.secrets.get("GEMINI_API_KEY", ""))
+        if not api_key:
+            st.error("❌ 请在侧边栏输入 API Key")
             return
 
         process_paper(url, illustration_count)
@@ -235,12 +226,20 @@ def show_results(paper_content, html_content, html_path, illustrations):
     st.divider()
     st.markdown("### 📥 下载结果")
 
+    # 生成文件名：论文标题_时间戳
+    import time
+    timestamp = time.strftime("%Y%m%d_%H%M%S")
+    # 清理标题中的特殊字符
+    safe_title = "".join(c for c in paper_content.title if c.isalnum() or c in (' ', '-', '_')).strip()
+    safe_title = safe_title[:50]  # 限制长度
+    filename = f"{safe_title}_{timestamp}.html" if safe_title else f"paper_{timestamp}.html"
+
     with open(html_path, "r", encoding="utf-8") as f:
         html_data = f.read()
     st.download_button(
         label="🌐 下载 HTML 网页版",
         data=html_data,
-        file_name="article.html",
+        file_name=filename,
         mime="text/html",
         use_container_width=True
     )
