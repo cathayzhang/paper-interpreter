@@ -15,6 +15,7 @@ from paper_to_popsci.core.analyzer import ContentAnalyzer
 from paper_to_popsci.core.illustrator import IllustrationGenerator
 from paper_to_popsci.core.writer import ArticleWriter
 from paper_to_popsci.core.renderer import HTMLRenderer
+from paper_to_popsci.core.multi_format_exporter import MultiFormatExporter
 
 st.set_page_config(
     page_title="Paper Interpreter - 论文解读专家",
@@ -190,23 +191,30 @@ def process_paper(url: str, illustration_count: int):
             renderer = HTMLRenderer()
             html_path = output_dir / "article.html"
             renderer.render(article_sections, paper_content, html_path)
+            progress_bar.progress(90)
+
+            # Step 7: 导出多格式
+            status_text.text("📦 正在导出多种格式...")
+            exporter = MultiFormatExporter()
+            export_results = exporter.export(
+                article_sections,
+                paper_content,
+                output_dir,
+                formats=['html', 'pdf', 'docx', 'md']
+            )
             progress_bar.progress(100)
 
             # 显示结果
             status_text.empty()
             progress_bar.empty()
 
-            # 读取生成的 HTML
-            with open(html_path, "r", encoding="utf-8") as f:
-                html_content = f.read()
-
-            show_results(paper_content, html_content, html_path, illustrations)
+            show_results(paper_content, export_results, illustrations)
 
         except Exception as e:
             st.error(f"❌ 处理失败: {str(e)}")
             raise
 
-def show_results(paper_content, html_content, html_path, illustrations):
+def show_results(paper_content, export_results, illustrations):
     """显示结果"""
     st.success(f"✅ 《{paper_content.title}》解读完成！")
 
@@ -217,44 +225,98 @@ def show_results(paper_content, html_content, html_path, illustrations):
     with col1:
         st.metric("配图生成", f"{success_images} 张")
     with col2:
-        word_count = len(html_content)
-        st.metric("文章字数", f"{word_count} 字")
+        word_count = len(paper_content.title) if paper_content.title else 0
+        st.metric("论文标题", f"{word_count} 字")
     with col3:
         st.metric("处理状态", "完成")
 
     # 下载按钮
     st.divider()
-    st.markdown("### 📥 下载结果")
+    st.markdown("### 📥 下载结果（多种格式）")
 
-    # 生成文件名：论文标题_时间戳
+    # 生成文件名基础：论文标题_时间戳
     import time
     timestamp = time.strftime("%Y%m%d_%H%M%S")
     # 清理标题中的特殊字符
     safe_title = "".join(c for c in paper_content.title if c.isalnum() or c in (' ', '-', '_')).strip()
     safe_title = safe_title[:50]  # 限制长度
-    filename = f"{safe_title}_{timestamp}.html" if safe_title else f"paper_{timestamp}.html"
+    base_name = f"{safe_title}_{timestamp}" if safe_title else f"paper_{timestamp}"
 
-    with open(html_path, "r", encoding="utf-8") as f:
-        html_data = f.read()
-    st.download_button(
-        label="🌐 下载 HTML 网页版",
-        data=html_data,
-        file_name=filename,
-        mime="text/html",
-        use_container_width=True
-    )
+    col1, col2 = st.columns(2)
+
+    # HTML 下载
+    if 'html' in export_results:
+        with col1:
+            with open(export_results['html'], "r", encoding="utf-8") as f:
+                html_data = f.read()
+            st.download_button(
+                label="🌐 下载 HTML 网页版",
+                data=html_data,
+                file_name=f"{base_name}.html",
+                mime="text/html",
+                use_container_width=True,
+                help="在浏览器中打开，支持术语悬停提示"
+            )
+
+    # Markdown 下载
+    if 'md' in export_results:
+        with col2:
+            with open(export_results['md'], "r", encoding="utf-8") as f:
+                md_data = f.read()
+            st.download_button(
+                label="📝 下载 Markdown",
+                data=md_data,
+                file_name=f"{base_name}.md",
+                mime="text/markdown",
+                use_container_width=True,
+                help="Markdown 格式，可在各种编辑器中打开"
+            )
+
+    col3, col4 = st.columns(2)
+
+    # PDF 下载
+    if 'pdf' in export_results:
+        with col3:
+            with open(export_results['pdf'], "rb") as f:
+                pdf_data = f.read()
+            st.download_button(
+                label="📄 下载 PDF",
+                data=pdf_data,
+                file_name=f"{base_name}.pdf",
+                mime="application/pdf",
+                use_container_width=True,
+                help="PDF 文档，适合打印和分享，包含图片"
+            )
+
+    # Word 下载
+    if 'docx' in export_results:
+        with col4:
+            with open(export_results['docx'], "rb") as f:
+                docx_data = f.read()
+            st.download_button(
+                label="📘 下载 Word",
+                data=docx_data,
+                file_name=f"{base_name}.docx",
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                use_container_width=True,
+                help="Microsoft Word 文档，包含图片，适合手机查看"
+            )
+
+    # 移动端推荐提示
+    st.info("📱 **手机用户推荐**: 下载 Word (.docx) 格式，可在手机上用 WPS、Office 等应用打开，图片显示更友好")
 
     # 文章预览
     st.divider()
     st.markdown("### 👁️ 文章预览")
 
     # 使用 iframe 显示 HTML 预览
-    with open(html_path, "r", encoding="utf-8") as f:
-        html_content = f.read()
-    
-    # 显示 HTML 内容（使用 components）
-    import streamlit.components.v1 as components
-    components.html(html_content, height=600, scrolling=True)
+    if 'html' in export_results:
+        with open(export_results['html'], "r", encoding="utf-8") as f:
+            html_content = f.read()
+
+        # 显示 HTML 内容（使用 components）
+        import streamlit.components.v1 as components
+        components.html(html_content, height=600, scrolling=True)
 
     # 显示生成的配图
     if any(i.get("success") for i in illustrations):
