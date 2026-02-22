@@ -12,7 +12,7 @@ from paper_to_popsci.core.extractor import PDFExtractor
 from paper_to_popsci.core.analyzer import ContentAnalyzer
 from paper_to_popsci.core.illustrator import IllustrationGenerator
 from paper_to_popsci.core.writer import ArticleWriter
-from paper_to_popsci.core.renderer import HTMLRenderer, PDFRenderer
+from paper_to_popsci.core.renderer import HTMLRenderer
 
 st.set_page_config(
     page_title="Paper Interpreter - 论文解读专家",
@@ -141,29 +141,25 @@ def process_paper(url: str, illustration_count: int):
             # Step 6: 渲染 HTML
             status_text.text("🎨 正在渲染页面...")
             renderer = HTMLRenderer()
-            html_content = renderer.render(article_sections, paper_content)
             html_path = output_dir / "article.html"
-            renderer.save(html_content, html_path)
-            progress_bar.progress(90)
-
-            # Step 7: 导出 PDF
-            status_text.text("📄 正在导出 PDF...")
-            pdf_renderer = PDFRenderer()
-            pdf_path = output_dir / "article.pdf"
-            pdf_renderer.render(html_content, pdf_path, output_dir)
+            renderer.render(article_sections, paper_content, html_path)
             progress_bar.progress(100)
 
             # 显示结果
             status_text.empty()
             progress_bar.empty()
 
-            show_results(paper_content, html_content, html_path, pdf_path, illustrations)
+            # 读取生成的 HTML
+            with open(html_path, "r", encoding="utf-8") as f:
+                html_content = f.read()
+
+            show_results(paper_content, html_content, html_path, illustrations)
 
         except Exception as e:
             st.error(f"❌ 处理失败: {str(e)}")
             raise
 
-def show_results(paper_content, html_content, html_path, pdf_path, illustrations):
+def show_results(paper_content, html_content, html_path, illustrations):
     """显示结果"""
     st.success(f"✅ 《{paper_content.title}》解读完成！")
 
@@ -183,29 +179,15 @@ def show_results(paper_content, html_content, html_path, pdf_path, illustrations
     st.divider()
     st.markdown("### 📥 下载结果")
 
-    col1, col2 = st.columns(2)
-
-    with col1:
-        with open(html_path, "r", encoding="utf-8") as f:
-            html_data = f.read()
-        st.download_button(
-            label="🌐 下载 HTML 网页版",
-            data=html_data,
-            file_name="article.html",
-            mime="text/html",
-            use_container_width=True
-        )
-
-    with col2:
-        with open(pdf_path, "rb") as f:
-            pdf_data = f.read()
-        st.download_button(
-            label="📄 下载 PDF 文档",
-            data=pdf_data,
-            file_name="article.pdf",
-            mime="application/pdf",
-            use_container_width=True
-        )
+    with open(html_path, "r", encoding="utf-8") as f:
+        html_data = f.read()
+    st.download_button(
+        label="🌐 下载 HTML 网页版",
+        data=html_data,
+        file_name="article.html",
+        mime="text/html",
+        use_container_width=True
+    )
 
     # 文章预览
     st.divider()
