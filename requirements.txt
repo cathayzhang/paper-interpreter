@@ -1,34 +1,19 @@
-# Paper to PopSci - 依赖清单
+# Streamlit Cloud 精简依赖
+# 只包含核心功能，移除重量级 PDF 导出依赖
 
 # 核心依赖
 requests>=2.31.0
 python-dotenv>=1.0.0
 
-# PDF 处理
-unstructured[pdf]>=0.12.0
+# PDF 处理 - 精简版
 PyPDF2>=3.0.0
-pikepdf>=8.0.0
+pdfplumber>=0.10.0
 
 # 图像处理
 Pillow>=10.0.0
 
-# HTML/PDF 导出
-weasyprint>=60.0
-playwright>=1.40.0
-pypandoc>=1.12.0
-
 # 工具库
 tqdm>=4.66.0
-lxml>=4.9.0
 
-# Web 部署依赖
-fastapi>=0.104.0
-uvicorn[standard]>=0.24.0
+# Streamlit
 streamlit>=1.28.0
-python-multipart>=0.0.6
-slowapi>=0.1.9
-gunicorn>=21.0.0
-
-# 可选依赖（提升 PDF 解析质量）
-# pdf2image>=1.17.0
-# pytesseract>=0.3.10
