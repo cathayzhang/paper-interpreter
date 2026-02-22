@@ -165,8 +165,16 @@ def process_paper(url: str, illustration_count: int):
             status_text.text("🧠 正在分析论文结构...")
             analyzer = ContentAnalyzer()
             analysis_result = analyzer.analyze(paper_content)
+            
+            st.write(f"**调试信息 - 分析结果类型:** {type(analysis_result)}")
+            st.write(f"**调试信息 - 分析结果键:** {analysis_result.keys() if isinstance(analysis_result, dict) else 'N/A'}")
+            
             outline = analysis_result["outline"]
             prompts = analysis_result["illustration_prompts"]
+            
+            st.write(f"**调试信息 - outline 类型:** {type(outline)}")
+            st.write(f"**调试信息 - outline sections:** {outline.get('sections', []) if isinstance(outline, dict) else 'N/A'}")
+            
             progress_bar.progress(45)
 
             # Step 4: 生成配图
