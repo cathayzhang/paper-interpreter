@@ -5,6 +5,7 @@ import json
 import re
 import subprocess
 import shutil
+import base64
 from pathlib import Path
 from typing import List, Optional
 
@@ -40,6 +41,28 @@ class HTMLRenderer:
 
         logger.info(f"HTML 渲染完成: {output_path}")
         return output_path
+
+    def _image_to_base64(self, image_path: str) -> str:
+        """将图片转换为 base64 编码"""
+        try:
+            with open(image_path, "rb") as f:
+                image_data = f.read()
+            base64_data = base64.b64encode(image_data).decode('utf-8')
+            
+            # 检测图片格式
+            ext = Path(image_path).suffix.lower()
+            mime_type = {
+                '.png': 'image/png',
+                '.jpg': 'image/jpeg',
+                '.jpeg': 'image/jpeg',
+                '.gif': 'image/gif',
+                '.webp': 'image/webp'
+            }.get(ext, 'image/png')
+            
+            return f"data:{mime_type};base64,{base64_data}"
+        except Exception as e:
+            logger.warning(f"图片转换失败: {e}")
+            return ""
 
     def _build_html(self, article_sections, paper_content) -> str:
         """构建完整 HTML"""
@@ -124,10 +147,12 @@ class HTMLRenderer:
 
         image_html = ""
         if image_path:
-            rel_path = Path(image_path).name
-            image_html = f'''
+            # 将图片转换为 base64
+            base64_img = self._image_to_base64(image_path)
+            if base64_img:
+                image_html = f'''
             <div class="mt-8 flex justify-center">
-                <img src="assets/images/{rel_path}" alt="{main_title}"
+                <img src="{base64_img}" alt="{main_title}"
                      class="max-h-80 object-contain rounded-lg shadow-lg">
             </div>'''
 
@@ -151,10 +176,12 @@ class HTMLRenderer:
 
         image_html = ""
         if image_path:
-            rel_path = Path(image_path).name
-            image_html = f'''
+            # 将图片转换为 base64
+            base64_img = self._image_to_base64(image_path)
+            if base64_img:
+                image_html = f'''
             <figure class="my-8 text-center">
-                <img src="assets/images/{rel_path}" alt="{title}"
+                <img src="{base64_img}" alt="{title}"
                      class="max-h-80 object-contain rounded-lg shadow-lg mx-auto border-4 border-[{self.style['background_color']}]">
                 <figcaption class="text-sm text-gray-500 mt-3 italic">图：{self._escape_html(title)}</figcaption>
             </figure>'''
@@ -180,10 +207,12 @@ class HTMLRenderer:
 
         image_html = ""
         if image_path:
-            rel_path = Path(image_path).name
-            image_html = f'''
+            # 将图片转换为 base64
+            base64_img = self._image_to_base64(image_path)
+            if base64_img:
+                image_html = f'''
             <figure class="my-8 text-center">
-                <img src="assets/images/{rel_path}" alt="{title}"
+                <img src="{base64_img}" alt="{title}"
                      class="max-h-80 object-contain rounded-lg shadow-lg mx-auto border-4 border-[{self.style['background_color']}]">
             </figure>'''
 
@@ -227,10 +256,12 @@ class HTMLRenderer:
 
         image_html = ""
         if image_path:
-            rel_path = Path(image_path).name
-            image_html = f'''
+            # 将图片转换为 base64
+            base64_img = self._image_to_base64(image_path)
+            if base64_img:
+                image_html = f'''
             <figure class="my-8 text-center">
-                <img src="assets/images/{rel_path}" alt="{title}"
+                <img src="{base64_img}" alt="{title}"
                      class="max-h-80 object-contain rounded-lg shadow-lg mx-auto border-4 border-[{self.style['background_color']}]">
             </figure>'''
 

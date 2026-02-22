@@ -249,18 +249,13 @@ def show_results(paper_content, html_content, html_path, illustrations):
     st.divider()
     st.markdown("### 👁️ 文章预览")
 
-    # 显示文章标题和前几段
+    # 使用 iframe 显示 HTML 预览
     with open(html_path, "r", encoding="utf-8") as f:
-        html_preview = f.read()
+        html_content = f.read()
     
-    # 提取正文内容（去除 HTML 标签）
-    import re
-    text_content = re.sub(r'<[^>]+>', '', html_preview)
-    text_content = re.sub(r'\s+', ' ', text_content).strip()
-    
-    # 显示前 500 字符
-    preview_text = text_content[:500] + "..." if len(text_content) > 500 else text_content
-    st.text(preview_text)
+    # 显示 HTML 内容（使用 components）
+    import streamlit.components.v1 as components
+    components.html(html_content, height=600, scrolling=True)
 
     # 显示生成的配图
     if any(i.get("success") for i in illustrations):
