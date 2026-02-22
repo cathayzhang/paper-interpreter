@@ -6,6 +6,8 @@ import streamlit as st
 import tempfile
 from pathlib import Path
 import time
+import os
+import requests
 
 from paper_to_popsci.core.downloader import PaperDownloader
 from paper_to_popsci.core.extractor import PDFExtractor
@@ -20,6 +22,48 @@ st.set_page_config(
     layout="centered",
     initial_sidebar_state="collapsed"
 )
+
+# 添加侧边栏测试功能
+with st.sidebar:
+    st.title("🔧 调试工具")
+    if st.button("🔍 测试 API 连接"):
+        st.subheader("API 配置检查")
+        
+        api_key = os.getenv("GEMINI_API_KEY", st.secrets.get("GEMINI_API_KEY", ""))
+        api_url = os.getenv("GEMINI_API_URL", st.secrets.get("GEMINI_API_URL", ""))
+        model = os.getenv("GEMINI_MODEL", st.secrets.get("GEMINI_MODEL", ""))
+        
+        st.write(f"API URL: `{api_url}`")
+        st.write(f"Model: `{model}`")
+        st.write(f"API Key 长度: `{len(api_key)}`")
+        st.write(f"API Key 前10位: `{api_key[:10]}...`")
+        st.write(f"API Key 后10位: `...{api_key[-10:]}`")
+        
+        # 测试连接
+        url = f"{api_url}/v1/chat/completions"
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key}",
+        }
+        data = {
+            "model": model,
+            "messages": [{"role": "user", "content": "Say this is a test!"}],
+            "temperature": 0.7,
+            "max_tokens": 100
+        }
+        
+        try:
+            response = requests.post(url, headers=headers, json=data, timeout=30)
+            st.write(f"**状态码：** `{response.status_code}`")
+            
+            if response.status_code == 200:
+                st.success("✅ API 连接成功！")
+                st.json(response.json())
+            else:
+                st.error(f"❌ API 返回错误")
+                st.code(response.text)
+        except Exception as e:
+            st.error(f"❌ 请求异常: {str(e)}")
 
 # 自定义样式 - 暖米色主题
 st.markdown("""
