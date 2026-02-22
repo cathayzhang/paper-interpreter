@@ -165,16 +165,8 @@ def process_paper(url: str, illustration_count: int):
             status_text.text("🧠 正在分析论文结构...")
             analyzer = ContentAnalyzer()
             analysis_result = analyzer.analyze(paper_content)
-            
-            st.write(f"**调试信息 - 分析结果类型:** {type(analysis_result)}")
-            st.write(f"**调试信息 - 分析结果键:** {analysis_result.keys() if isinstance(analysis_result, dict) else 'N/A'}")
-            
             outline = analysis_result["outline"]
             prompts = analysis_result["illustration_prompts"]
-            
-            st.write(f"**调试信息 - outline 类型:** {type(outline)}")
-            st.write(f"**调试信息 - outline sections:** {outline.get('sections', []) if isinstance(outline, dict) else 'N/A'}")
-            
             progress_bar.progress(45)
 
             # Step 4: 生成配图
@@ -188,7 +180,18 @@ def process_paper(url: str, illustration_count: int):
             # Step 5: 生成文章
             status_text.text("✍️ 正在撰写科普文章...")
             writer = ArticleWriter()
-            article_sections = writer.write(paper_content, outline, illustrations)
+            
+            # 确保 outline 是字典格式
+            if not isinstance(outline, dict):
+                st.error("❌ 大纲格式错误")
+                return
+                
+            article_sections = writer.write(paper_content, {"outline": outline}, illustrations)
+            
+            if not article_sections or len(article_sections) <= 1:
+                st.error("❌ 文章生成失败，请重试")
+                return
+                
             progress_bar.progress(80)
 
             # Step 6: 渲染 HTML
@@ -246,9 +249,18 @@ def show_results(paper_content, html_content, html_path, illustrations):
     st.divider()
     st.markdown("### 👁️ 文章预览")
 
-    # 显示前几段作为预览
-    preview = html_content[:500] + "..." if len(html_content) > 500 else html_content
-    st.markdown(preview, unsafe_allow_html=True)
+    # 显示文章标题和前几段
+    with open(html_path, "r", encoding="utf-8") as f:
+        html_preview = f.read()
+    
+    # 提取正文内容（去除 HTML 标签）
+    import re
+    text_content = re.sub(r'<[^>]+>', '', html_preview)
+    text_content = re.sub(r'\s+', ' ', text_content).strip()
+    
+    # 显示前 500 字符
+    preview_text = text_content[:500] + "..." if len(text_content) > 500 else text_content
+    st.text(preview_text)
 
     # 显示生成的配图
     if any(i.get("success") for i in illustrations):
