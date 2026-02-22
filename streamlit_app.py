@@ -120,12 +120,13 @@ def process_paper(url: str, illustration_count: int):
             # Step 3: 分析
             status_text.text("🧠 正在分析论文结构...")
             analyzer = ContentAnalyzer()
-            outline = analyzer.analyze(paper_content)
+            analysis_result = analyzer.analyze(paper_content)
+            outline = analysis_result["outline"]
+            prompts = analysis_result["illustration_prompts"]
             progress_bar.progress(45)
 
             # Step 4: 生成配图
             status_text.text("🎨 正在生成配图...")
-            prompts = analyzer.generate_illustration_prompts(outline)
             prompts = prompts[:illustration_count]
 
             illustrator = IllustrationGenerator()
