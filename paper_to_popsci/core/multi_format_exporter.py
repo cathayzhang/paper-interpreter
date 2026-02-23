@@ -135,40 +135,8 @@ class MultiFormatExporter:
             if section.section_type not in ['hero', 'paper_info']:
                 toc_entries.append(section.title)
 
-        # 添加目录
-        if toc_entries:
-            toc_heading = doc.add_paragraph()
-            toc_heading.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            toc_run = toc_heading.add_run('目录')
-            toc_run.font.name = 'Noto Serif SC'
-            toc_run.font.size = Pt(18)
-            toc_run.font.bold = True
-            toc_run.font.color.rgb = RGBColor(22, 160, 133)
-            toc_heading.paragraph_format.space_after = Pt(12)
-
-            for i, entry in enumerate(toc_entries, 1):
-                toc_item = doc.add_paragraph()
-                toc_item.paragraph_format.left_indent = Inches(0.5)
-                toc_item.paragraph_format.space_after = Pt(4)
-
-                num_run = toc_item.add_run(f'{i}. ')
-                num_run.font.name = 'Noto Sans SC'
-                num_run.font.size = Pt(11)
-                num_run.font.color.rgb = RGBColor(22, 160, 133)
-
-                entry_run = toc_item.add_run(entry)
-                entry_run.font.name = 'Noto Sans SC'
-                entry_run.font.size = Pt(11)
-
-            # 添加分隔线
-            doc.add_paragraph()
-            separator = doc.add_paragraph('─' * 50)
-            separator.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            sep_run = separator.runs[0]
-            sep_run.font.color.rgb = RGBColor(200, 200, 200)
-            doc.add_paragraph()
-
         # 处理每个章节
+        hero_added = False
         for section in article_sections:
             section_type = section.section_type
             title = section.title
@@ -177,6 +145,10 @@ class MultiFormatExporter:
 
             if section_type == "hero":
                 self._add_hero_to_docx(doc, title, content, image_path)
+                hero_added = True
+                # 在Hero区之后添加目录
+                if toc_entries:
+                    self._add_toc_to_docx(doc, toc_entries)
             elif section_type == "paper_info":
                 self._add_paper_info_to_docx(doc, title, content)
             elif section_type == "recommendations":
@@ -184,10 +156,54 @@ class MultiFormatExporter:
             else:
                 self._add_section_to_docx(doc, title, content, image_path)
 
+        # 如果没有hero区但有目录，在最开始添加目录
+        if not hero_added and toc_entries:
+            self._add_toc_to_docx(doc, toc_entries)
+
         # 保存文档
         docx_path = output_dir / "article.docx"
         doc.save(str(docx_path))
         return docx_path
+
+    def _add_toc_to_docx(self, doc: 'Document', toc_entries: list):
+        """添加目录到 Word 文档"""
+        from docx.shared import Pt, RGBColor, Inches
+        from docx.enum.text import WD_ALIGN_PARAGRAPH
+
+        if not toc_entries:
+            return
+
+        # 添加目录标题
+        toc_heading = doc.add_paragraph()
+        toc_heading.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        toc_run = toc_heading.add_run('目录')
+        toc_run.font.name = 'Noto Serif SC'
+        toc_run.font.size = Pt(18)
+        toc_run.font.bold = True
+        toc_run.font.color.rgb = RGBColor(22, 160, 133)
+        toc_heading.paragraph_format.space_after = Pt(12)
+
+        for i, entry in enumerate(toc_entries, 1):
+            toc_item = doc.add_paragraph()
+            toc_item.paragraph_format.left_indent = Inches(0.5)
+            toc_item.paragraph_format.space_after = Pt(4)
+
+            num_run = toc_item.add_run(f'{i}. ')
+            num_run.font.name = 'Noto Sans SC'
+            num_run.font.size = Pt(11)
+            num_run.font.color.rgb = RGBColor(22, 160, 133)
+
+            entry_run = toc_item.add_run(entry)
+            entry_run.font.name = 'Noto Sans SC'
+            entry_run.font.size = Pt(11)
+
+        # 添加分隔线
+        doc.add_paragraph()
+        separator = doc.add_paragraph('─' * 50)
+        separator.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        sep_run = separator.runs[0]
+        sep_run.font.color.rgb = RGBColor(200, 200, 200)
+        doc.add_paragraph()
 
     def _add_hyperlink(self, paragraph, text: str, url: str):
         """在段落中添加可点击的超链接"""
@@ -430,91 +446,95 @@ class MultiFormatExporter:
                     value_run.font.size = Pt(10)
 
     def _add_recommendations_to_docx(self, doc: 'Document', title: str, content: str):
-        """添加推荐章节到 Word - 优化卡片式排版，减少空白"""
+        """添加推荐章节到 Word - 参考论文信息排版风格"""
         from docx.shared import Pt, RGBColor, Inches
         from docx.enum.text import WD_ALIGN_PARAGRAPH
-        from docx.enum.table import WD_TABLE_ALIGNMENT
 
-        # 简洁的章节分隔
+        # 分隔线
         doc.add_paragraph()
-        separator = doc.add_paragraph("─" * 40)
-        separator.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        separator_run = separator.runs[0]
-        separator_run.font.color.rgb = RGBColor(200, 200, 200)
-        separator_run.font.size = Pt(9)
+        doc.add_paragraph("_" * 60)
 
-        # 标题 - 减小间距
+        # 标题 - 使用与论文信息相同的样式
         heading = doc.add_heading(level=2)
-        heading.alignment = WD_ALIGN_PARAGRAPH.LEFT
         heading_run = heading.add_run(title)
         heading_run.font.name = 'Noto Serif SC'
-        heading_run.font.size = Pt(18)
-        heading_run.font.color.rgb = RGBColor(22, 160, 133)
-        heading_run.font.bold = True
-        heading.paragraph_format.space_before = Pt(8)
-        heading.paragraph_format.space_after = Pt(6)
+        heading_run.font.size = Pt(14)
+        heading_run.font.color.rgb = RGBColor(128, 128, 128)
 
         # 处理内容
         lines = content.split('\n')
+        current_paper = None  # 当前处理的论文
+
         for line in lines:
             line = line.strip()
             if not line:
                 continue
 
-            # 跳过说明文字、分隔线和空内容
-            if '基于学术论文引用网络' in line or line == '---' or not line:
+            # 跳过说明文字、分隔线
+            if '基于学术论文引用网络' in line or line == '---':
                 continue
 
-            # 处理子标题
+            # 处理子标题 (### 🔬 相关论文推荐)
             if line.startswith('###'):
-                sub_heading = doc.add_paragraph()
-                sub_run = sub_heading.add_run(line.replace('###', '').strip())
-                sub_run.font.name = 'Noto Serif SC'
-                sub_run.font.size = Pt(12)
-                sub_run.font.color.rgb = RGBColor(22, 160, 133)
-                sub_run.font.bold = True
-                sub_heading.paragraph_format.space_before = Pt(8)
-                sub_heading.paragraph_format.space_after = Pt(4)
+                sub_title = line.replace('###', '').strip()
+                # 移除emoji
+                sub_title = sub_title.replace('🔬', '').replace('📚', '').replace('🔍', '').strip()
 
-            # 处理论文标题（**数字. 标题** (年份)**）
+                sub_para = doc.add_paragraph()
+                sub_run = sub_para.add_run(sub_title)
+                sub_run.font.name = 'Noto Serif SC'
+                sub_run.font.size = Pt(11)
+                sub_run.font.bold = True
+                sub_run.font.color.rgb = RGBColor(22, 160, 133)
+                sub_para.paragraph_format.space_before = Pt(8)
+                sub_para.paragraph_format.space_after = Pt(4)
+
+            # 处理论文标题（**1. Title** (2024)）
             elif re.match(r'\*\*\d+\.', line):
-                # 提取数字、标题和年份
                 match = re.match(r'\*\*(\d+)\.\s*([^*]+?)\*\*\s*\((\d{4})\)', line)
                 if match:
                     num, paper_title, year = match.groups()
+
+                    # 论文标题作为一个段落
                     title_para = doc.add_paragraph()
-                    title_para.paragraph_format.space_before = Pt(6)
-                    title_para.paragraph_format.space_after = Pt(2)
+                    title_para.paragraph_format.space_before = Pt(8)
+                    title_para.paragraph_format.space_after = Pt(4)
 
                     num_run = title_para.add_run(f"{num}. ")
                     num_run.font.name = 'Noto Sans SC'
-                    num_run.font.size = Pt(11)
+                    num_run.font.size = Pt(10)
                     num_run.font.bold = True
                     num_run.font.color.rgb = RGBColor(22, 160, 133)
 
                     title_run = title_para.add_run(f"{paper_title} ({year})")
                     title_run.font.name = 'Noto Serif SC'
-                    title_run.font.size = Pt(11)
+                    title_run.font.size = Pt(10)
                     title_run.font.bold = True
 
-            # 处理列表项 - 支持超链接
+            # 处理列表项 - 使用标签: 值的格式
             elif line.startswith('- **'):
                 clean_line = line.replace('- **', '').strip()
-                # 处理 [text](url) 链接
+
+                # 跳过一键解读链接
+                if '一键解读' in clean_line or '📄' in clean_line:
+                    continue
+
+                # 处理 [text](url) 链接格式
                 link_match = re.search(r'\[([^\]]+)\]\(([^)]+)\)', clean_line)
                 if link_match:
+                    # 提取标签（链接前的文字）
                     label_text = clean_line[:link_match.start()].replace('**', '').strip()
                     link_text = link_match.group(1)
                     link_url = link_match.group(2)
 
-                    # 跳过一键解读链接在Word中
-                    if '一键解读' in link_text or 'interpret://' in link_url:
-                        continue
+                    # 移除末尾的冒号
+                    label_text = label_text.rstrip(':').strip()
 
                     item_para = doc.add_paragraph()
-                    item_para.paragraph_format.space_after = Pt(2)
+                    item_para.paragraph_format.space_after = Pt(3)
                     item_para.paragraph_format.left_indent = Inches(0.2)
 
+                    # 标签加粗
                     if label_text:
                         label_run = item_para.add_run(f"{label_text}: ")
                         label_run.font.name = 'Noto Sans SC'
@@ -524,14 +544,15 @@ class MultiFormatExporter:
                     # 添加超链接
                     self._add_hyperlink(item_para, link_text, link_url)
                 else:
-                    # 无链接的普通列表项
-                    clean_line = clean_line.replace('**', '').strip()
+                    # 无链接的普通文本
+                    clean_line = clean_line.replace('**', '')
                     if ':' in clean_line:
                         parts = clean_line.split(':', 1)
                         label = parts[0].strip()
                         value = parts[1].strip() if len(parts) > 1 else ""
+
                         item_para = doc.add_paragraph()
-                        item_para.paragraph_format.space_after = Pt(2)
+                        item_para.paragraph_format.space_after = Pt(3)
                         item_para.paragraph_format.left_indent = Inches(0.2)
 
                         label_run = item_para.add_run(f"{label}: ")
@@ -539,11 +560,12 @@ class MultiFormatExporter:
                         label_run.font.size = Pt(10)
                         label_run.font.bold = True
 
-                        value_run = item_para.add_run(value)
-                        value_run.font.name = 'Noto Sans SC'
-                        value_run.font.size = Pt(10)
+                        if value:
+                            value_run = item_para.add_run(value)
+                            value_run.font.name = 'Noto Sans SC'
+                            value_run.font.size = Pt(10)
 
-            # 处理引用网络列表项
+            # 处理引用网络列表项 (- [Title](url) (year))
             elif line.startswith('- ['):
                 link_match = re.search(r'- \[([^\]]+)\]\(([^)]+)\)\s*\((\d{4})\)?', line)
                 if link_match:
@@ -552,24 +574,40 @@ class MultiFormatExporter:
                     year = link_match.group(3) if link_match.group(3) else ""
 
                     item_para = doc.add_paragraph()
-                    item_para.paragraph_format.space_after = Pt(2)
-                    item_para.paragraph_format.left_indent = Inches(0.2)
+                    item_para.paragraph_format.space_after = Pt(3)
+                    item_para.paragraph_format.left_indent = Inches(0.3)
+
+                    # 添加圆点符号
+                    bullet_run = item_para.add_run("• ")
+                    bullet_run.font.name = 'Noto Sans SC'
+                    bullet_run.font.size = Pt(10)
 
                     # 添加超链接
                     display_text = f"{title_text} ({year})" if year else title_text
                     self._add_hyperlink(item_para, display_text, url)
 
-            # 处理普通段落 - 支持超链接
-            elif line and not line.startswith('#') and '**' in line:
-                para = doc.add_paragraph()
-                para.paragraph_format.space_after = Pt(3)
+            # 处理推荐理由等普通段落
+            elif line.startswith('**') and '推荐理由' in line:
+                clean_line = line.replace('**', '')
+                if ':' in clean_line:
+                    parts = clean_line.split(':', 1)
+                    label = parts[0].strip()
+                    value = parts[1].strip() if len(parts) > 1 else ""
 
-                # 清理并添加文本
-                clean_line = line.replace('**', '').strip()
-                if clean_line:
-                    run = para.add_run(clean_line)
-                    run.font.name = 'Noto Sans SC'
-                    run.font.size = Pt(10)
+                    reason_para = doc.add_paragraph()
+                    reason_para.paragraph_format.space_after = Pt(3)
+                    reason_para.paragraph_format.left_indent = Inches(0.2)
+
+                    label_run = reason_para.add_run(f"{label}: ")
+                    label_run.font.name = 'Noto Sans SC'
+                    label_run.font.size = Pt(10)
+                    label_run.font.bold = True
+
+                    if value:
+                        value_run = reason_para.add_run(value)
+                        value_run.font.name = 'Noto Sans SC'
+                        value_run.font.size = Pt(10)
+                        value_run.font.italic = True
 
     def _clean_markdown_for_word(self, text: str) -> str:
         """清理 Markdown 标记以便 Word 显示 - 完全版本"""
