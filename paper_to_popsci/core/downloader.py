@@ -304,7 +304,7 @@ class PaperDownloader:
 
         try:
             # 获取元数据
-            api_url = f"https://api.semanticscholar.org/graph/v1/paper/{paper_id}?fields=title,authors,abstract,year,openAccessPdf"
+            api_url = f"https://api.semanticscholar.org/graph/v1/paper/{paper_id}?fields=title,authors,abstract,year,openAccessPdf,externalIds"
             response = self.session.get(api_url, timeout=Config.DEFAULT_TIMEOUT_SECONDS)
             metadata = {"source_url": url}
 
@@ -326,12 +326,31 @@ class PaperDownloader:
                 self._download_file(pdf_url, pdf_path)
                 return pdf_path, metadata
             else:
-                logger.warning("Semantic Scholar 未找到开放获取 PDF")
-                return self._download_generic(url, output_dir, metadata)
+                logger.warning("Semantic Scholar 未找到开放获取 PDF，尝试其他方案...")
+                # 尝试获取 externalIds 中的 arXiv ID
+                try:
+                    if response.status_code == 200:
+                        data = response.json()
+                        external_ids = data.get("externalIds", {})
+                        arxiv_id = external_ids.get("ArXiv")
+                        if arxiv_id:
+                            logger.info(f"找到 arXiv ID: {arxiv_id}")
+                            return self._download_arxiv(f"https://arxiv.org/abs/{arxiv_id}", output_dir)
+                except Exception as e:
+                    logger.warning(f"尝试 arXiv 回退失败: {e}")
+
+                # 如果没有开放获取，报错提示用户
+                raise RuntimeError(
+                    "该论文在 Semantic Scholar 上没有开放获取 PDF。\n"
+                    "建议:\n"
+                    "1. 如果论文在 arXiv 上，请使用 arXiv 链接\n"
+                    "2. 如果论文有 DOI，请使用 DOI 链接\n"
+                    "3. 或者直接粘贴 PDF 的直链"
+                )
 
         except Exception as e:
             logger.warning(f"Semantic Scholar 下载失败: {e}")
-            return self._download_generic(url, output_dir)
+            raise RuntimeError(f"无法从 Semantic Scholar 下载论文: {e}")
 
     def _download_googlescholar(self, url: str, output_dir: Path) -> Tuple[Path, dict]:
         """处理 Google Scholar 链接
