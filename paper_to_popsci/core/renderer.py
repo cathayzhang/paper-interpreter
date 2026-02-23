@@ -250,7 +250,7 @@ class HTMLRenderer:
                     {content_html}
                 </div>
             </div>
-        </section>"""} }
+        </section>"""
 
     def _render_conclusion_section(self, title: str, content: str, image_path: Optional[str]) -> str:
         """渲染总结章节"""
