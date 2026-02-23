@@ -59,6 +59,8 @@ class PaperDownloader:
             pdf_path, metadata = self._download_openreview(url, output_dir)
         elif link_type == "semanticscholar":
             pdf_path, metadata = self._download_semanticscholar(url, output_dir)
+        elif link_type == "googlescholar":
+            pdf_path, metadata = self._download_googlescholar(url, output_dir)
         else:
             # 通用下载方案
             pdf_path, metadata = self._download_generic(url, output_dir)
@@ -84,6 +86,8 @@ class PaperDownloader:
             return "openreview"
         elif "semanticscholar.org" in url_lower:
             return "semanticscholar"
+        elif "scholar.google.com" in url_lower or "google.com/scholar" in url_lower:
+            return "googlescholar"
         elif url_lower.endswith(".pdf"):
             return "pdf_direct"
         else:
@@ -270,13 +274,32 @@ class PaperDownloader:
             return self._download_generic(url, output_dir)
 
     def _download_semanticscholar(self, url: str, output_dir: Path) -> Tuple[Path, dict]:
-        """下载 Semantic Scholar 论文"""
-        # 提取 paper ID
-        match = re.search(r"paper/([^/]+)", url)
-        if not match:
-            return self._download_generic(url, output_dir)
+        """下载 Semantic Scholar 论文
 
-        paper_id = match.group(1)
+        支持两种 URL 格式：
+        1. https://www.semanticscholar.org/paper/PAPER_ID
+        2. https://www.semanticscholar.org/paper/标题/PAPER_ID
+        """
+        # 提取 paper ID - 取最后一个 / 后面的内容（hex 字符串）
+        # 格式: .../paper/标题/PAPER_ID 或 .../paper/PAPER_ID
+        patterns = [
+            r"/paper/(?:[^/]+/)?([a-f0-9]{40})",  # 匹配最后一个 40 位 hex ID（最常见）
+            r"/paper/(?:[^/]+/)?([a-f0-9]{32})",  # 匹配 32 位 hex ID
+            r"/paper/(?:[^/]+/)?([^/]+)",          # 后备方案：取最后一个 / 后的内容
+        ]
+
+        paper_id = None
+        for pattern in patterns:
+            match = re.search(pattern, url)
+            if match:
+                paper_id = match.group(1)
+                # 验证看起来像个 ID（不是纯标题）
+                if len(paper_id) >= 20 or re.match(r'^[a-f0-9]+$', paper_id):
+                    break
+
+        if not paper_id:
+            logger.warning(f"无法从 URL 提取 Semantic Scholar paper ID: {url}")
+            return self._download_generic(url, output_dir)
         pdf_path = output_dir / f"semanticscholar_{paper_id}.pdf"
 
         try:
@@ -309,6 +332,141 @@ class PaperDownloader:
         except Exception as e:
             logger.warning(f"Semantic Scholar 下载失败: {e}")
             return self._download_generic(url, output_dir)
+
+    def _download_googlescholar(self, url: str, output_dir: Path) -> Tuple[Path, dict]:
+        """处理 Google Scholar 链接
+
+        Google Scholar 通常不直接提供 PDF 下载，而是提供论文信息页面。
+        我们尝试从页面中提取 PDF 链接，或通过标题搜索其他开放获取源。
+        """
+        logger.info(f"处理 Google Scholar 链接: {url}")
+        metadata = {"source_url": url}
+
+        try:
+            # 获取 Google Scholar 页面
+            response = self.session.get(url, timeout=Config.DEFAULT_TIMEOUT_SECONDS)
+            response.raise_for_status()
+
+            # 尝试从页面提取标题
+            from html.parser import HTMLParser
+
+            class TitleExtractor(HTMLParser):
+                def __init__(self):
+                    super().__init__()
+                    self.in_title = False
+                    self.title = ""
+                    self.title_div_count = 0
+
+                def handle_starttag(self, tag, attrs):
+                    attrs_dict = dict(attrs)
+                    # Google Scholar 的标题通常在 class="gs_rt" 的 h3 标签中
+                    if tag == "h3" and attrs_dict.get("class") == "gs_rt":
+                        self.in_title = True
+                    elif self.in_title and tag in ["span", "div"]:
+                        self.title_div_count += 1
+
+                def handle_endtag(self, tag):
+                    if self.in_title:
+                        if tag == "h3" and self.title_div_count == 0:
+                            self.in_title = False
+                        elif tag in ["span", "div"]:
+                            self.title_div_count -= 1
+
+                def handle_data(self, data):
+                    if self.in_title:
+                        self.title += data
+
+            # 尝试提取标题
+            title = None
+            if "cluster=" in url or "cites=" in url:
+                # 提取标题 - 使用简单的正则
+                title_match = re.search(r'<h3 class="gs_rt"[^>]*>(.*?)</h3>', response.text, re.DOTALL)
+                if title_match:
+                    title_html = title_match.group(1)
+                    # 移除 HTML 标签
+                    title = re.sub(r'<[^>]+>', '', title_html)
+                    title = re.sub(r'\[PDF\]|\[HTML\]|\s+', ' ', title).strip()
+
+            if not title:
+                # 尝试从页面标题中提取
+                title_match = re.search(r'<title>(.*?) - Google Scholar</title>', response.text)
+                if title_match:
+                    title = title_match.group(1).strip()
+
+            if title:
+                logger.info(f"从 Google Scholar 提取到标题: {title}")
+                metadata["title"] = title
+
+                # 尝试搜索 arXiv
+                arxiv_match = re.search(r'arxiv\.org/abs/(\d+\.\d+)', response.text)
+                if arxiv_match:
+                    arxiv_id = arxiv_match.group(1)
+                    logger.info(f"找到 arXiv 链接: {arxiv_id}")
+                    return self._download_arxiv(f"https://arxiv.org/abs/{arxiv_id}", output_dir)
+
+                # 尝试搜索 DOI
+                doi_match = re.search(r'10\.\d{4,}/[^\s"<>]+', response.text)
+                if doi_match:
+                    doi = doi_match.group(0)
+                    logger.info(f"找到 DOI: {doi}")
+                    return self._download_doi(f"https://doi.org/{doi}", output_dir)
+
+                # 尝试搜索页面中的 PDF 链接
+                pdf_patterns = [
+                    r'href="([^"]+\.pdf)"',
+                    r'href="(/scholar[^"]*cache[^"]*)"',
+                ]
+                for pattern in pdf_patterns:
+                    pdf_match = re.search(pattern, response.text)
+                    if pdf_match:
+                        pdf_url = pdf_match.group(1)
+                        if pdf_url.startswith('/'):
+                            pdf_url = f"https://scholar.google.com{pdf_url}"
+                        logger.info(f"找到 PDF 链接: {pdf_url}")
+                        try:
+                            pdf_path = output_dir / f"googlescholar_{int(time.time())}.pdf"
+                            self._download_file(pdf_url, pdf_path)
+                            if self._validate_pdf(pdf_path):
+                                return pdf_path, metadata
+                        except Exception as e:
+                            logger.warning(f"Google Scholar PDF 下载失败: {e}")
+
+                # 如果都没找到，尝试通过 Semantic Scholar API 搜索
+                try:
+                    search_url = f"https://api.semanticscholar.org/graph/v1/paper/search"
+                    params = {
+                        "query": title,
+                        "fields": "paperId,openAccessPdf",
+                        "limit": 1
+                    }
+                    ss_response = self.session.get(search_url, params=params, timeout=10)
+                    if ss_response.status_code == 200:
+                        data = ss_response.json()
+                        papers = data.get("data", [])
+                        if papers and papers[0].get("openAccessPdf"):
+                            pdf_url = papers[0]["openAccessPdf"].get("url")
+                            paper_id = papers[0].get("paperId")
+                            if pdf_url and paper_id:
+                                logger.info(f"通过 Semantic Scholar 找到 PDF: {paper_id}")
+                                pdf_path = output_dir / f"semanticscholar_{paper_id}.pdf"
+                                self._download_file(pdf_url, pdf_path)
+                                if self._validate_pdf(pdf_path):
+                                    return pdf_path, metadata
+                except Exception as e:
+                    logger.warning(f"Semantic Scholar 搜索失败: {e}")
+
+            logger.warning("Google Scholar 无法找到可用的 PDF 下载链接")
+            raise RuntimeError(
+                "Google Scholar 链接无法直接下载 PDF。\n"
+                "建议:\n"
+                "1. 如果论文在 arXiv 上，请使用 arXiv 链接\n"
+                "2. 如果论文有 DOI，请使用 DOI 链接\n"
+                "3. 或者直接粘贴 PDF 的直链"
+            )
+
+        except Exception as e:
+            logger.warning(f"Google Scholar 处理失败: {e}")
+            raise RuntimeError(f"无法从 Google Scholar 链接下载论文: {e}")
 
     def _download_generic(self, url: str, output_dir: Path, metadata: Optional[dict] = None) -> Tuple[Path, dict]:
         """通用下载方案"""
