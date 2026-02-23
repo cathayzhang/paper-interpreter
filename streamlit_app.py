@@ -260,9 +260,20 @@ def process_paper(url: str, illustration_count: int):
             safe_title = safe_title[:50]
             base_name = f"{safe_title}_{timestamp}" if safe_title else f"paper_{timestamp}"
 
+            # 读取配图为字节并保存
+            illustrations_with_bytes = []
+            for ill in illustrations:
+                if ill.get("success") and ill.get("filepath") and Path(ill["filepath"]).exists():
+                    with open(ill["filepath"], "rb") as f:
+                        ill_copy = ill.copy()
+                        ill_copy["image_bytes"] = f.read()
+                        illustrations_with_bytes.append(ill_copy)
+                else:
+                    illustrations_with_bytes.append(ill)
+
             # 保存到 session_state
             st.session_state.paper_title = paper_content.title
-            st.session_state.illustrations = illustrations
+            st.session_state.illustrations = illustrations_with_bytes
             st.session_state.base_name = base_name
             st.session_state.export_results = {}
             st.session_state.export_paths = {}  # 保存路径用于调试
@@ -411,8 +422,12 @@ def show_result_page():
         st.markdown("### 🖼️ 生成的配图")
 
         for ill in st.session_state.illustrations:
-            if ill.get("success") and ill.get("filepath"):
-                st.image(ill["filepath"], caption=ill.get("section", ""))
+            if ill.get("success"):
+                # 优先使用字节数据，回退到文件路径
+                if ill.get("image_bytes"):
+                    st.image(ill["image_bytes"], caption=ill.get("section", ""))
+                elif ill.get("filepath") and Path(ill["filepath"]).exists():
+                    st.image(ill["filepath"], caption=ill.get("section", ""))
 
     # 底部返回按钮
     st.divider()
