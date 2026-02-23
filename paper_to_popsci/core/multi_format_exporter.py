@@ -326,8 +326,8 @@ class MultiFormatExporter:
         heading_run.font.size = Pt(20)
         heading_run.font.color.rgb = RGBColor(22, 160, 133)  # 使用主题绿色
         heading_run.font.bold = True
-        heading.paragraph_format.space_before = Pt(24)
-        heading.paragraph_format.space_after = Pt(12)
+        heading.paragraph_format.space_before = Pt(18)
+        heading.paragraph_format.space_after = Pt(10)
         heading.paragraph_format.keep_with_next = True  # 与下一段保持在一起
 
         # 处理内容 - 清理 Markdown
@@ -340,10 +340,14 @@ class MultiFormatExporter:
             if not para_text:
                 continue
 
+            # 跳过纯标记行
+            if para_text in ['---', '***', '___'] or para_text.startswith('---'):
+                continue
+
             para = doc.add_paragraph()
-            para.paragraph_format.line_spacing = 1.6  # 适当的行距
-            para.paragraph_format.space_after = Pt(10)
-            para.paragraph_format.first_line_indent = Inches(0.3)  # 首行缩进
+            para.paragraph_format.line_spacing = 1.5  # 适当的行距
+            para.paragraph_format.space_after = Pt(8)
+            para.paragraph_format.first_line_indent = Inches(0)  # 无首行缩进，使用段间距
 
             # 处理术语注解和加粗文本
             self._add_formatted_text_to_para(para, para_text)
@@ -426,37 +430,29 @@ class MultiFormatExporter:
                     value_run.font.size = Pt(10)
 
     def _add_recommendations_to_docx(self, doc: 'Document', title: str, content: str):
-        """添加推荐章节到 Word - 优化卡片式排版"""
+        """添加推荐章节到 Word - 优化卡片式排版，减少空白"""
         from docx.shared import Pt, RGBColor, Inches
         from docx.enum.text import WD_ALIGN_PARAGRAPH
         from docx.enum.table import WD_TABLE_ALIGNMENT
 
-        # 章节分隔
+        # 简洁的章节分隔
         doc.add_paragraph()
-        separator = doc.add_paragraph("─" * 50)
+        separator = doc.add_paragraph("─" * 40)
         separator.alignment = WD_ALIGN_PARAGRAPH.CENTER
         separator_run = separator.runs[0]
         separator_run.font.color.rgb = RGBColor(200, 200, 200)
-        doc.add_paragraph()
+        separator_run.font.size = Pt(9)
 
-        # 标题
+        # 标题 - 减小间距
         heading = doc.add_heading(level=2)
         heading.alignment = WD_ALIGN_PARAGRAPH.LEFT
         heading_run = heading.add_run(title)
         heading_run.font.name = 'Noto Serif SC'
-        heading_run.font.size = Pt(20)
+        heading_run.font.size = Pt(18)
         heading_run.font.color.rgb = RGBColor(22, 160, 133)
         heading_run.font.bold = True
-        heading.paragraph_format.space_before = Pt(12)
-        heading.paragraph_format.space_after = Pt(12)
-
-        # 说明文字
-        intro_para = doc.add_paragraph()
-        intro_run = intro_para.add_run("基于学术论文引用网络和语义相似度分析，为您推荐以下相关研究：")
-        intro_run.font.name = 'Noto Sans SC'
-        intro_run.font.size = Pt(11)
-        intro_run.font.italic = True
-        intro_para.paragraph_format.space_after = Pt(12)
+        heading.paragraph_format.space_before = Pt(8)
+        heading.paragraph_format.space_after = Pt(6)
 
         # 处理内容
         lines = content.split('\n')
@@ -465,40 +461,40 @@ class MultiFormatExporter:
             if not line:
                 continue
 
-            # 跳过说明文字（已添加）
-            if '基于学术论文引用网络' in line or line == '---':
+            # 跳过说明文字、分隔线和空内容
+            if '基于学术论文引用网络' in line or line == '---' or not line:
                 continue
 
             # 处理子标题
             if line.startswith('###'):
-                sub_heading = doc.add_heading(level=3)
+                sub_heading = doc.add_paragraph()
                 sub_run = sub_heading.add_run(line.replace('###', '').strip())
                 sub_run.font.name = 'Noto Serif SC'
-                sub_run.font.size = Pt(14)
+                sub_run.font.size = Pt(12)
                 sub_run.font.color.rgb = RGBColor(22, 160, 133)
                 sub_run.font.bold = True
-                sub_heading.paragraph_format.space_before = Pt(12)
-                sub_heading.paragraph_format.space_after = Pt(6)
+                sub_heading.paragraph_format.space_before = Pt(8)
+                sub_heading.paragraph_format.space_after = Pt(4)
 
-            # 处理论文标题（**数字. 标题**）
+            # 处理论文标题（**数字. 标题** (年份)**）
             elif re.match(r'\*\*\d+\.', line):
-                # 提取数字和标题
-                match = re.match(r'\*\*(\d+)\.\s*([^*]+)\*\*', line)
+                # 提取数字、标题和年份
+                match = re.match(r'\*\*(\d+)\.\s*([^*]+?)\*\*\s*\((\d{4})\)', line)
                 if match:
-                    num, paper_title = match.groups()
+                    num, paper_title, year = match.groups()
                     title_para = doc.add_paragraph()
-                    title_para.paragraph_format.space_before = Pt(8)
-                    title_para.paragraph_format.space_after = Pt(4)
+                    title_para.paragraph_format.space_before = Pt(6)
+                    title_para.paragraph_format.space_after = Pt(2)
 
                     num_run = title_para.add_run(f"{num}. ")
                     num_run.font.name = 'Noto Sans SC'
-                    num_run.font.size = Pt(12)
+                    num_run.font.size = Pt(11)
                     num_run.font.bold = True
                     num_run.font.color.rgb = RGBColor(22, 160, 133)
 
-                    title_run = title_para.add_run(paper_title)
+                    title_run = title_para.add_run(f"{paper_title} ({year})")
                     title_run.font.name = 'Noto Serif SC'
-                    title_run.font.size = Pt(12)
+                    title_run.font.size = Pt(11)
                     title_run.font.bold = True
 
             # 处理列表项 - 支持超链接
@@ -511,11 +507,16 @@ class MultiFormatExporter:
                     link_text = link_match.group(1)
                     link_url = link_match.group(2)
 
+                    # 跳过一键解读链接在Word中
+                    if '一键解读' in link_text or 'interpret://' in link_url:
+                        continue
+
                     item_para = doc.add_paragraph()
-                    item_para.paragraph_format.space_after = Pt(3)
+                    item_para.paragraph_format.space_after = Pt(2)
+                    item_para.paragraph_format.left_indent = Inches(0.2)
 
                     if label_text:
-                        label_run = item_para.add_run(f"{label_text} ")
+                        label_run = item_para.add_run(f"{label_text}: ")
                         label_run.font.name = 'Noto Sans SC'
                         label_run.font.size = Pt(10)
                         label_run.font.bold = True
@@ -526,32 +527,46 @@ class MultiFormatExporter:
                     # 无链接的普通列表项
                     clean_line = clean_line.replace('**', '').strip()
                     if ':' in clean_line:
-                        label, value = clean_line.split(':', 1)
+                        parts = clean_line.split(':', 1)
+                        label = parts[0].strip()
+                        value = parts[1].strip() if len(parts) > 1 else ""
                         item_para = doc.add_paragraph()
-                        item_para.paragraph_format.space_after = Pt(3)
+                        item_para.paragraph_format.space_after = Pt(2)
+                        item_para.paragraph_format.left_indent = Inches(0.2)
 
                         label_run = item_para.add_run(f"{label}: ")
                         label_run.font.name = 'Noto Sans SC'
                         label_run.font.size = Pt(10)
                         label_run.font.bold = True
 
-                        value_run = item_para.add_run(value.strip())
+                        value_run = item_para.add_run(value)
                         value_run.font.name = 'Noto Sans SC'
                         value_run.font.size = Pt(10)
 
-            # 处理普通段落 - 支持超链接
-            elif line and not line.startswith('#'):
-                # 检查是否包含链接
-                link_match = re.search(r'\[([^\]]+)\]\(([^)]+)\)', line)
+            # 处理引用网络列表项
+            elif line.startswith('- ['):
+                link_match = re.search(r'- \[([^\]]+)\]\(([^)]+)\)\s*\((\d{4})\)?', line)
                 if link_match:
-                    para = doc.add_paragraph()
-                    para.paragraph_format.space_after = Pt(4)
-                    self._extract_and_add_links(para, line)
-                else:
-                    para = doc.add_paragraph()
-                    para.paragraph_format.space_after = Pt(4)
+                    title_text = link_match.group(1)
+                    url = link_match.group(2)
+                    year = link_match.group(3) if link_match.group(3) else ""
 
-                    clean_line = line.replace('**', '').replace('*', '').strip()
+                    item_para = doc.add_paragraph()
+                    item_para.paragraph_format.space_after = Pt(2)
+                    item_para.paragraph_format.left_indent = Inches(0.2)
+
+                    # 添加超链接
+                    display_text = f"{title_text} ({year})" if year else title_text
+                    self._add_hyperlink(item_para, display_text, url)
+
+            # 处理普通段落 - 支持超链接
+            elif line and not line.startswith('#') and '**' in line:
+                para = doc.add_paragraph()
+                para.paragraph_format.space_after = Pt(3)
+
+                # 清理并添加文本
+                clean_line = line.replace('**', '').strip()
+                if clean_line:
                     run = para.add_run(clean_line)
                     run.font.name = 'Noto Sans SC'
                     run.font.size = Pt(10)
@@ -574,8 +589,16 @@ class MultiFormatExporter:
         text = re.sub(r'\n---\n', '\n', text)
         text = re.sub(r'^---+$', '', text, flags=re.MULTILINE)
 
-        # 处理链接 - 保留文本，移除 URL 部分
-        # [text](url) -> text
+        # 处理术语注解 *术语（解释）* -> 保留术语和解释
+        text = re.sub(r'\*([^*（]+?)（(.+?)）\*', r'\1（\2）', text)
+
+        # 处理加粗标记 **text** -> 保留文本
+        text = re.sub(r'\*\*([^*]+)\*\*', r'\1', text)
+
+        # 处理斜体标记 *text* -> 保留文本
+        text = re.sub(r'\*([^*]+)\*', r'\1', text)
+
+        # 处理链接 - [text](url) -> text
         text = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', text)
 
         # 移除表情符号前的标记
@@ -600,10 +623,10 @@ class MultiFormatExporter:
                 # 数字列表保留数字，去掉多余空格
                 line = re.sub(r'^(\d+)\.\s+', r'\1. ', line)
 
-            # 处理加粗标记 **text**
+            # 再次处理加粗标记（可能在处理列表后还有剩余）
             line = re.sub(r'\*\*([^*]+)\*\*', r'\1', line)
 
-            # 处理斜体标记 *text*
+            # 再次处理斜体标记
             line = re.sub(r'\*([^*]+)\*', r'\1', line)
 
             # 移除前导空格

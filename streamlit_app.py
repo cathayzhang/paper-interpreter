@@ -427,39 +427,6 @@ def show_result_page():
     # 移动端推荐提示
     st.info("📱 **手机用户推荐**: 下载 Word (.docx) 格式，可在手机上用 WPS、Office 等应用打开，图片显示更友好")
 
-    # 显示推荐论文（可点击解读）
-    if st.session_state.get("recommended_papers"):
-        st.divider()
-        st.markdown("### 📚 推荐论文（点击解读）")
-        st.caption("点击下方按钮，快速解读相关论文")
-
-        papers = st.session_state.recommended_papers[:5]  # 最多显示5篇
-        cols = st.columns(min(len(papers), 3))  # 每行最多3个按钮
-
-        for idx, paper in enumerate(papers):
-            with cols[idx % 3]:
-                paper_title = paper.get("title", "未知论文")[:30] + "..." if len(paper.get("title", "")) > 30 else paper.get("title", "未知论文")
-                paper_url = paper.get("url", "")
-                if paper_url and st.button(
-                    f"📄 {paper_title}",
-                    key=f"interpret_paper_{idx}",
-                    use_container_width=True,
-                    help=f"解读《{paper.get('title', '')}》"
-                ):
-                    # 设置URL并开始解读
-                    st.session_state.paper_url = paper_url
-                    st.session_state.page = 'input'
-                    st.rerun()
-
-        with st.expander("🔗 复制推荐论文链接"):
-            for idx, paper in enumerate(papers):
-                st.text_input(
-                    f"论文 {idx + 1}",
-                    value=paper.get("url", ""),
-                    key=f"paper_url_{idx}",
-                    label_visibility="visible"
-                )
-
     # 文章预览
     st.divider()
     st.markdown("### 👁️ 文章预览")
@@ -491,6 +458,19 @@ def check_interpret_url():
     """检查是否有从"一键解读"传递过来的URL"""
     # 从查询参数中获取
     query_params = st.query_params
+
+    # 处理从下载HTML传递过来的arXiv ID
+    if "arxiv" in query_params:
+        arxiv_id = query_params["arxiv"]
+        # 构建arXiv URL
+        arxiv_url = f"https://arxiv.org/abs/{arxiv_id}"
+        # 清空查询参数
+        st.query_params.clear()
+        # 设置URL并开始解读
+        st.session_state.paper_url = arxiv_url
+        return arxiv_url
+
+    # 处理旧的interpret_url参数（向后兼容）
     if "interpret_url" in query_params:
         encoded_url = query_params["interpret_url"]
         # 解码URL
@@ -500,6 +480,7 @@ def check_interpret_url():
         # 设置URL并开始解读
         st.session_state.paper_url = actual_url
         return actual_url
+
     return None
 
 def main():

@@ -189,12 +189,12 @@ class HTMLRenderer:
             </figure>'''
 
         return f"""
-        <section class="section py-10 {section_class}">
-            <h2 class="text-3xl font-bold mb-8 pb-3 border-b-2 border-[{self.style['accent_color']}] tracking-tight"
-                style="font-family: {self.style['font_family']}; color: {self.style['text_color']}">
+        <section class="section py-8 {section_class}" style="margin-bottom: 2rem; border-bottom: 1px solid rgba(0,0,0,0.05);">
+            <h2 class="text-3xl font-bold mb-6 pb-3 border-b-2 border-[{self.style['accent_color']}] tracking-tight"
+                style="font-family: {self.style['font_family']}; color: {self.style['text_color']}; margin-top: 0;">
                 {self._escape_html(title)}
             </h2>
-            <div class="prose prose-lg max-w-none leading-relaxed">
+            <div class="prose prose-lg max-w-none leading-relaxed" style="padding-top: 0.5rem;">
                 {content_html}
             </div>
             {image_html}
@@ -219,12 +219,12 @@ class HTMLRenderer:
             </figure>'''
 
         return f"""
-        <section class="section py-10 results">
-            <h2 class="text-3xl font-bold mb-8 pb-3 border-b-2 border-[{self.style['accent_color']}] tracking-tight"
-                style="font-family: {self.style['font_family']}; color: {self.style['text_color']}">
+        <section class="section py-8 results" style="margin-bottom: 2rem; border-bottom: 1px solid rgba(0,0,0,0.05);">
+            <h2 class="text-3xl font-bold mb-6 pb-3 border-b-2 border-[{self.style['accent_color']}] tracking-tight"
+                style="font-family: {self.style['font_family']}; color: {self.style['text_color']}; margin-top: 0;">
                 {self._escape_html(title)}
             </h2>
-            <div class="prose prose-lg max-w-none leading-relaxed">
+            <div class="prose prose-lg max-w-none leading-relaxed" style="padding-top: 0.5rem;">
                 {content_html}
             </div>
             {image_html}
@@ -238,19 +238,19 @@ class HTMLRenderer:
         accent = self.style['accent_color']
         text_color = self.style['text_color']
         return f"""
-        <section class="section py-10 impact">
-            <h2 class="text-3xl font-bold mb-8 pb-3 border-b-2 border-[{accent}] tracking-tight"
-                style="font-family: {self.style['font_family']}; color: {text_color}">
+        <section class="section py-8 impact" style="margin-bottom: 2rem; border-bottom: 1px solid rgba(0,0,0,0.05);">
+            <h2 class="text-3xl font-bold mb-6 pb-3 border-b-2 border-[{accent}] tracking-tight"
+                style="font-family: {self.style['font_family']}; color: {text_color}; margin-top: 0;">
                 {self._escape_html(title)}
             </h2>
-            <div class="relative pl-8 py-6 my-4">
+            <div class="relative pl-8 py-4 my-2" style="padding-top: 0.5rem;">
                 <div class="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-[{accent}] to-[{accent}] opacity-60 rounded-full"></div>
                 <div class="absolute left-[-4px] top-0 w-3 h-3 rounded-full bg-[{accent}] opacity-80"></div>
                 <div class="prose prose-lg max-w-none leading-relaxed italic" style="color: {text_color}">
                     {content_html}
                 </div>
             </div>
-        </section>"""
+        </section>"""} }
 
     def _render_conclusion_section(self, title: str, content: str, image_path: Optional[str]) -> str:
         """渲染总结章节"""
@@ -268,13 +268,13 @@ class HTMLRenderer:
             </figure>'''
 
         return f"""
-        <section class="section py-10 conclusion">
-            <h2 class="text-3xl font-bold mb-8 pb-3 border-b-2 border-[{self.style['accent_color']}] tracking-tight"
-                style="font-family: {self.style['font_family']}; color: {self.style['text_color']}"
+        <section class="section py-8 conclusion" style="margin-bottom: 2rem; border-bottom: 1px solid rgba(0,0,0,0.05);">
+            <h2 class="text-3xl font-bold mb-6 pb-3 border-b-2 border-[{self.style['accent_color']}] tracking-tight"
+                style="font-family: {self.style['font_family']}; color: {self.style['text_color']}; margin-top: 0;"
 >
                 {self._escape_html(title)}
             </h2>
-            <div class="prose prose-lg max-w-none leading-relaxed">
+            <div class="prose prose-lg max-w-none leading-relaxed" style="padding-top: 0.5rem;">
                 {content_html}
             </div>
             {image_html}
@@ -333,12 +333,12 @@ class HTMLRenderer:
         content_html = self._style_recommendation_cards_html(content_html)
 
         return f"""
-        <section class="section py-10 recommendations">
-            <h2 class="text-3xl font-bold mb-8 pb-3 border-b-2 border-[{self.style['accent_color']}] tracking-tight"
-                style="font-family: {self.style['font_family']}; color: {self.style['text_color']}">
+        <section class="section py-6 recommendations" style="margin-bottom: 1rem;">
+            <h2 class="text-3xl font-bold mb-4 pb-3 border-b-2 border-[{self.style['accent_color']}] tracking-tight"
+                style="font-family: {self.style['font_family']}; color: {self.style['text_color']}; margin-top: 0;">
                 {self._escape_html(title)}
             </h2>
-            <div class="prose prose-lg max-w-none leading-relaxed">
+            <div class="prose prose-lg max-w-none leading-relaxed" style="padding-top: 0.5rem;">
                 {content_html}
             </div>
         </section>"""
@@ -377,7 +377,7 @@ class HTMLRenderer:
                     arxiv_match = re.search(r'arxiv\.org/abs/(\d+\.\d+)', href)
                     if arxiv_match:
                         arxiv_id = arxiv_match.group(1)
-                        return f'    <div style="margin-top: 16px;"><a href="https://arxiv.org/abs/{arxiv_id}" target="_blank" style="display: inline-block; padding: 10px 20px; background-color: {accent}; color: white; text-decoration: none; border-radius: 6px; font-size: 14px; font-weight: 500; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">📄 一键解读这篇论文</a></div>'
+                        return f'    <div style="margin-top: 16px;"><a href="https://paper-interpreter.streamlit.app/?arxiv={arxiv_id}" target="_blank" style="display: inline-block; padding: 10px 20px; background-color: {accent}; color: white; text-decoration: none; border-radius: 6px; font-size: 14px; font-weight: 500; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">📄 一键解读这篇论文</a></div>'
                     else:
                         return f'    <div style="margin-top: 16px;"><a href="{href}" target="_blank" style="display: inline-block; padding: 10px 20px; background-color: {accent}; color: white; text-decoration: none; border-radius: 6px; font-size: 14px; font-weight: 500; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">📄 一键解读这篇论文</a></div>'
 
@@ -507,10 +507,17 @@ class HTMLRenderer:
         def replace_interpret_link(match):
             link_text = match.group(1)
             encoded_url = match.group(2).replace('interpret://', '')
-            # 解码URL
+            # 解码URL用于显示
             actual_url = encoded_url.replace('%2F', '/').replace('%3A', ':')
-            # 生成HTML按钮，点击后通过JavaScript设置localStorage并跳转
-            return f'''<a href="?interpret_url={encoded_url}" class="interpret-btn" style="display:inline-block;padding:8px 16px;background:#16A085;color:white;text-decoration:none;border-radius:6px;font-weight:500;box-shadow:0 2px 4px rgba(0,0,0,0.1);margin:4px 0;">📄 {link_text}</a>'''
+            # 提取arXiv ID用于跳转
+            arxiv_match = re.search(r'arxiv\.org/abs/(\d+\.\d+)', actual_url)
+            if arxiv_match:
+                arxiv_id = arxiv_match.group(1)
+                # 生成HTML按钮，点击后跳转到主站并自动开始解读
+                return f'''<a href="https://paper-interpreter.streamlit.app/?arxiv={arxiv_id}" class="interpret-btn" style="display:inline-block;padding:8px 16px;background:#16A085;color:white;text-decoration:none;border-radius:6px;font-weight:500;box-shadow:0 2px 4px rgba(0,0,0,0.1);margin:4px 0;" target="_blank">📄 {link_text}</a>'''
+            else:
+                # 非arXiv链接，使用原链接
+                return f'''<a href="{actual_url}" class="interpret-btn" style="display:inline-block;padding:8px 16px;background:#16A085;color:white;text-decoration:none;border-radius:6px;font-weight:500;box-shadow:0 2px 4px rgba(0,0,0,0.1);margin:4px 0;" target="_blank">📄 {link_text}</a>'''
 
         text = re.sub(r'\[([^\]]+)\]\(interpret://([^)]+)\)', replace_interpret_link, text)
 
