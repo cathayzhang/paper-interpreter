@@ -423,8 +423,7 @@ class PaperRecommender:
     def format_for_article(self, recommendations: Dict[str, List[RelatedPaper]]) -> str:
         """将推荐结果格式化为文章 markdown 格式"""
         lines = []
-        lines.append("## 关系探索与智能推荐")
-        lines.append("")
+        # 注意：章节标题由 renderer 处理，这里不需要添加 ## 标题
 
         has_recommendations = any(
             recommendations.get(key) for key in ["semantic_scholar", "citations", "similar_topics"]
@@ -457,18 +456,28 @@ class PaperRecommender:
                 else:
                     # 实际论文推荐
                     lines.append(f"**{i}. {paper.title}** ({paper.year})")
+                    lines.append("")
                     if paper.authors:
-                        lines.append(f"- **作者**: {', '.join(paper.authors)}")
+                        lines.append(f"**作者**: {', '.join(paper.authors)}")
+                        lines.append("")
                     if paper.citation_count:
-                        lines.append(f"- **被引次数**: {paper.citation_count}")
+                        lines.append(f"**被引次数**: {paper.citation_count}")
+                        lines.append("")
                     if paper.abstract:
-                        lines.append(f"- **简介**: {paper.abstract}")
+                        lines.append(f"**简介**: {paper.abstract}")
+                        lines.append("")
                     if paper.url:
-                        lines.append(f"- **链接**: [{paper.url}]({paper.url})")
+                        lines.append(f"**链接**: [点击查看详情]({paper.url})")
+                        lines.append("")
+                        # 添加论文解读按钮链接
+                        lines.append(f"**[📄 一键解读这篇论文]({paper.url})**")
+                        lines.append("")
                     if paper.pdf_url:
-                        lines.append(f"- **PDF**: [免费下载]({paper.pdf_url})")
+                        lines.append(f"**PDF**: [免费下载]({paper.pdf_url})")
+                        lines.append("")
                     if paper.reason:
-                        lines.append(f"- **推荐理由**: {paper.reason}")
+                        lines.append(f"**推荐理由**: {paper.reason}")
+                        lines.append("")
                 lines.append("")
 
         # 2. 引用网络

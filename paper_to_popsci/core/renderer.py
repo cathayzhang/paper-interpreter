@@ -326,10 +326,11 @@ class HTMLRenderer:
 
     def _render_recommendations_section(self, title: str, content: str, image_path: Optional[str]) -> str:
         """渲染推荐章节"""
+        # 先将 Markdown 转换为 HTML，然后应用特殊样式
         content_html = self._markdown_to_html(content)
 
-        # 特殊处理推荐卡片样式
-        content_html = self._style_recommendation_cards(content_html)
+        # 对生成的 HTML 应用推荐卡片样式
+        content_html = self._style_recommendation_cards_html(content_html)
 
         return f"""
         <section class="section py-10 recommendations">
@@ -342,33 +343,89 @@ class HTMLRenderer:
             </div>
         </section>"""
 
-    def _style_recommendation_cards(self, html: str) -> str:
-        """为推荐内容添加卡片样式"""
-        # 为推荐论文标题添加样式
+    def _style_recommendation_cards_html(self, html: str) -> str:
+        """为推荐内容的 HTML 添加卡片样式"""
         import re
 
-        # 匹配 **数字. 标题** 格式并添加样式
+        accent = self.style['accent_color']
+
+        # 1. 为论文标题（带年份）添加卡片容器
+        # 匹配: <p><strong>1. Title</strong> (2024)</p>
+        title_pattern = r'<p[^>]*><strong>(\d+)\.\s*([^<]+?)</strong>\s*\((\d{4})\)</p>'
+
+        def wrap_paper_card(match):
+            num = match.group(1)
+            title = match.group(2).strip()
+            year = match.group(3)
+            return f'<div class="paper-card" style="background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border-left: 4px solid {accent};">\n    <h4 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 12px; margin-top: 0; color: {accent};">{num}. {title} <span style="color: #6b7280; font-size: 1rem; font-weight: 400;">({year})</span></h4>'
+
+        html = re.sub(title_pattern, wrap_paper_card, html)
+
+        # 2. 为属性标签（作者、简介等）添加更好的格式
+        # 匹配: <p><strong>标签:</strong> 内容</p>
+        def format_property(match):
+            label = match.group(1)
+            content = match.group(2).strip()
+
+            # 特殊处理"一键解读"按钮
+            if "一键解读" in label or "📄" in label:
+                # 提取链接
+                link_match = re.search(r'href="([^"]+)"', content)
+                if link_match:
+                    href = link_match.group(1)
+                    # 提取arXiv ID
+                    arxiv_match = re.search(r'arxiv\.org/abs/(\d+\.\d+)', href)
+                    if arxiv_match:
+                        arxiv_id = arxiv_match.group(1)
+                        return f'    <div style="margin-top: 16px;"><a href="https://arxiv.org/abs/{arxiv_id}" target="_blank" style="display: inline-block; padding: 10px 20px; background-color: {accent}; color: white; text-decoration: none; border-radius: 6px; font-size: 14px; font-weight: 500; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">📄 一键解读这篇论文</a></div>'
+                    else:
+                        return f'    <div style="margin-top: 16px;"><a href="{href}" target="_blank" style="display: inline-block; padding: 10px 20px; background-color: {accent}; color: white; text-decoration: none; border-radius: 6px; font-size: 14px; font-weight: 500; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">📄 一键解读这篇论文</a></div>'
+
+            # 处理包含链接的内容
+            if '<a' in content:
+                return f'    <div style="margin-bottom: 10px; line-height: 1.6;"><span style="font-weight: 600; color: #374151;">{label}:</span> {content}</div>'
+
+            return f'    <div style="margin-bottom: 10px; line-height: 1.6; color: #4b5563;"><span style="font-weight: 600; color: #374151;">{label}:</span> {content}</div>'
+
+        property_pattern = r'<p[^>]*><strong>([^:<]+):</strong>\s*(.+?)</p>'
+        html = re.sub(property_pattern, format_property, html)
+
+        # 3. 在下一个卡片开始前或章节结束前关闭 div
+        # 找到所有卡片开始位置，然后在下一个 <h4> 前或结束处添加 </div>
+        card_matches = list(re.finditer(r'<div class="paper-card', html))
+        if card_matches:
+            # 从后向前处理，避免插入位置偏移问题
+            for i in range(len(card_matches) - 1, -1, -1):
+                match = card_matches[i]
+                start_pos = match.start()
+
+                # 找到这个卡片的结束位置（下一个卡片开始或字符串结束）
+                if i + 1 < len(card_matches):
+                    end_pos = card_matches[i + 1].start()
+                else:
+                    end_pos = len(html)
+
+                # 在这个位置前插入 </div>
+                # 在 end_pos 之前找到最后一个非空字符的位置
+                content_before = html[start_pos:end_pos]
+                trailing_ws_match = re.search(r'\s*$', content_before)
+                if trailing_ws_match:
+                    insert_offset = trailing_ws_match.start()
+                    actual_insert_pos = start_pos + insert_offset
+                    html = html[:actual_insert_pos] + '</div>\n' + html[actual_insert_pos:]
+
+        # 4. 为普通链接添加样式（如果还没有样式）
         html = re.sub(
-            r'\*\*(\d+)\.\s*([^<]+)\*\*',
-            r'<h4 class="text-xl font-bold mt-6 mb-2" style="color: {accent}">\1. \2</h4>'.format(
-                accent=self.style['accent_color']
-            ),
+            r'<a(?![^>]*class=)([^>]*)href="([^"]+)"([^\u003e]*)>',
+            rf'<a\1href="\2"\3 class="hover:underline" style="color: {accent};">',
             html
         )
 
-        # 为来源标签添加样式
+        # 5. 处理小节标题（🔬 相关论文推荐 等）
+        # 匹配 <p>🔬 text</p> 或 <p><strong>🔬 text</strong></p>
         html = re.sub(
-            r'\*\*([^*]+)\*\*:',
-            r'<span class="font-bold text-gray-700">\1:</span>',
-            html
-        )
-
-        # 为链接添加样式
-        html = re.sub(
-            r'\[([^\]]+)\]\(([^)]+)\)',
-            r'<a href="\2" target="_blank" class="text-[{accent}] hover:underline">\1</a>'.format(
-                accent=self.style['accent_color']
-            ),
+            r'<p[^>]*>(?:<strong>)?(🔬|📚|🔍|💡)\s*([^<]+?)(?:</strong>)?</p>',
+            rf'<h3 class="text-xl font-bold mt-8 mb-4" style="color: {accent};">\1 \2</h3>',
             html
         )
 
@@ -441,9 +498,12 @@ class HTMLRenderer:
         return text
 
     def _apply_inline_formatting(self, text: str) -> str:
-        """应用行内格式（加粗、斜体、术语注解）"""
+        """应用行内格式（加粗、斜体、链接、术语注解）"""
+        import re
         # 处理术语注解 *术语（解释）* -> 转换为专业格式
         text = self._process_term_annotations(text)
+        # 处理链接 [text](url)
+        text = re.sub(r'\[([^\]]+)\]\(([^)]+)\)', r'<a href="\2" target="_blank" class="hover:underline" style="color: ' + self.style['accent_color'] + r'">\1</a>', text)
         # 处理加粗 **text**
         text = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', text)
         # 处理斜体 *text* (剩余的)
