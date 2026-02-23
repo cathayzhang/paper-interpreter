@@ -46,8 +46,11 @@ class MultiFormatExporter:
         if 'pdf' in formats:
             try:
                 pdf_path = self._export_pdf(html_path, output_dir)
-                results['pdf'] = pdf_path
-                logger.info(f"PDF 导出成功: {pdf_path}")
+                if pdf_path and pdf_path.exists():
+                    results['pdf'] = pdf_path
+                    logger.info(f"PDF 导出成功: {pdf_path}")
+                else:
+                    logger.warning("PDF 导出失败: 未生成有效文件")
             except Exception as e:
                 logger.warning(f"PDF 导出失败: {e}")
 
@@ -55,8 +58,11 @@ class MultiFormatExporter:
         if 'docx' in formats:
             try:
                 docx_path = self._export_docx(article_sections, paper_content, output_dir)
-                results['docx'] = docx_path
-                logger.info(f"Word 导出成功: {docx_path}")
+                if docx_path and docx_path.exists():
+                    results['docx'] = docx_path
+                    logger.info(f"Word 导出成功: {docx_path}")
+                else:
+                    logger.warning("Word 导出失败: 未生成有效文件")
             except Exception as e:
                 logger.warning(f"Word 导出失败: {e}")
 
@@ -64,8 +70,11 @@ class MultiFormatExporter:
         if 'md' in formats:
             try:
                 md_path = self._export_markdown(article_sections, paper_content, output_dir)
-                results['md'] = md_path
-                logger.info(f"Markdown 导出成功: {md_path}")
+                if md_path and md_path.exists():
+                    results['md'] = md_path
+                    logger.info(f"Markdown 导出成功: {md_path}")
+                else:
+                    logger.warning("Markdown 导出失败: 未生成有效文件")
             except Exception as e:
                 logger.warning(f"Markdown 导出失败: {e}")
 
@@ -131,6 +140,8 @@ class MultiFormatExporter:
                 self._add_hero_to_docx(doc, title, content, image_path)
             elif section_type == "paper_info":
                 self._add_paper_info_to_docx(doc, title, content)
+            elif section_type == "recommendations":
+                self._add_recommendations_to_docx(doc, title, content)
             else:
                 self._add_section_to_docx(doc, title, content, image_path)
 
@@ -295,6 +306,98 @@ class MultiFormatExporter:
                     value_run = para.add_run(value)
                     value_run.font.name = 'Noto Sans SC'
                     value_run.font.size = Pt(10)
+
+    def _add_recommendations_to_docx(self, doc: 'Document', title: str, content: str):
+        """添加推荐章节到 Word"""
+        from docx.shared import Pt, RGBColor, Inches
+        from docx.enum.text import WD_ALIGN_PARAGRAPH
+
+        # 标题
+        heading = doc.add_heading(level=2)
+        heading_run = heading.add_run(title)
+        heading_run.font.name = 'Noto Serif SC'
+        heading_run.font.size = Pt(18)
+        heading_run.font.color.rgb = RGBColor(44, 62, 80)
+        heading_run.font.bold = True
+
+        # 说明文字
+        intro_para = doc.add_paragraph()
+        intro_run = intro_para.add_run("基于学术论文引用网络和语义相似度分析，为您推荐以下相关研究：")
+        intro_run.font.name = 'Noto Sans SC'
+        intro_run.font.size = Pt(11)
+        intro_run.font.italic = True
+        intro_para.paragraph_format.space_after = Pt(12)
+
+        # 处理内容
+        lines = content.split('\n')
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+
+            # 跳过说明文字（已添加）
+            if '基于学术论文引用网络' in line or line == '---':
+                continue
+
+            # 处理子标题
+            if line.startswith('###'):
+                sub_heading = doc.add_heading(level=3)
+                sub_run = sub_heading.add_run(line.replace('###', '').strip())
+                sub_run.font.name = 'Noto Serif SC'
+                sub_run.font.size = Pt(14)
+                sub_run.font.color.rgb = RGBColor(22, 160, 133)
+                sub_run.font.bold = True
+                sub_heading.paragraph_format.space_before = Pt(12)
+                sub_heading.paragraph_format.space_after = Pt(6)
+
+            # 处理论文标题（**数字. 标题**）
+            elif re.match(r'\*\*\d+\.', line):
+                # 提取数字和标题
+                match = re.match(r'\*\*(\d+)\.\s*([^*]+)\*\*', line)
+                if match:
+                    num, paper_title = match.groups()
+                    title_para = doc.add_paragraph()
+                    title_para.paragraph_format.space_before = Pt(8)
+                    title_para.paragraph_format.space_after = Pt(4)
+
+                    num_run = title_para.add_run(f"{num}. ")
+                    num_run.font.name = 'Noto Sans SC'
+                    num_run.font.size = Pt(12)
+                    num_run.font.bold = True
+                    num_run.font.color.rgb = RGBColor(22, 160, 133)
+
+                    title_run = title_para.add_run(paper_title)
+                    title_run.font.name = 'Noto Serif SC'
+                    title_run.font.size = Pt(12)
+                    title_run.font.bold = True
+
+            # 处理列表项
+            elif line.startswith('- **'):
+                clean_line = line.replace('- **', '').replace('**', '', 1).strip()
+                if ':' in clean_line:
+                    label, value = clean_line.split(':', 1)
+                    item_para = doc.add_paragraph()
+                    item_para.paragraph_format.left_indent = Inches(0.3)
+                    item_para.paragraph_format.space_after = Pt(3)
+
+                    label_run = item_para.add_run(f"{label}: ")
+                    label_run.font.name = 'Noto Sans SC'
+                    label_run.font.size = Pt(10)
+                    label_run.font.bold = True
+
+                    value_run = item_para.add_run(value.strip())
+                    value_run.font.name = 'Noto Sans SC'
+                    value_run.font.size = Pt(10)
+
+            # 处理普通段落
+            elif line and not line.startswith('#'):
+                para = doc.add_paragraph()
+                para.paragraph_format.left_indent = Inches(0.3)
+                para.paragraph_format.space_after = Pt(4)
+
+                run = para.add_run(line)
+                run.font.name = 'Noto Sans SC'
+                run.font.size = Pt(10)
 
     def _clean_markdown_for_word(self, text: str) -> str:
         """清理 Markdown 标记以便 Word 显示"""

@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from .config import Config
 from .logger import logger
 from .llm_client import LLMClient
+from .paper_recommender import PaperRecommender
 
 
 @dataclass
@@ -51,9 +52,21 @@ class ArticleWriter:
 
         # 构建配图映射
         image_map = {}
+        logger.info(f"开始构建配图映射，共 {len(illustrations)} 张图")
         for ill in illustrations:
-            if ill.get("success") and ill.get("filepath"):
-                image_map[ill["section"]] = ill["filepath"]
+            section = ill.get("section", "unknown")
+            success = ill.get("success", False)
+            filepath = ill.get("filepath")
+            logger.info(f"处理配图: section={section}, success={success}, filepath={filepath}")
+            if success and filepath:
+                # 映射特殊情况：comparison -> results
+                if section == "comparison":
+                    logger.info(f"映射 comparison -> results")
+                    section = "results"
+                image_map[section] = filepath
+                logger.info(f"配图已映射: {section} -> {filepath}")
+
+        logger.info(f"配图映射完成: {image_map}")
 
         # 生成每个章节
         for section_data in outline_sections:
@@ -79,8 +92,14 @@ class ArticleWriter:
             # 关联配图
             if section_type in image_map:
                 section.image_path = image_map[section_type]
+                logger.info(f"章节 '{section_type}' 已关联配图: {image_map[section_type]}")
+            else:
+                logger.info(f"章节 '{section_type}' 未找到配图")
 
             sections.append(section)
+
+        # 添加论文关系探索与智能推荐章节
+        sections.append(self._generate_recommendations(paper_content))
 
         # 添加论文信息章节
         sections.append(self._generate_paper_info(paper_content))
@@ -347,6 +366,48 @@ class ArticleWriter:
             title=title,
             content=content
         )
+
+    def _generate_recommendations(self, paper_content) -> ArticleSection:
+        """生成论文关系探索与智能推荐"""
+        try:
+            recommender = PaperRecommender()
+            recommendations = recommender.get_recommendations(
+                paper_title=paper_content.title,
+                paper_abstract=paper_content.abstract,
+                arxiv_id=paper_content.arxiv_id,
+                doi=paper_content.doi,
+                limit=8
+            )
+            content = recommender.format_for_article(recommendations)
+        except Exception as e:
+            logger.warning(f"论文推荐生成失败: {e}")
+            content = self._get_default_recommendations(paper_content)
+
+        return ArticleSection(
+            section_type="recommendations",
+            title="关系探索与智能推荐",
+            content=content
+        )
+
+    def _get_default_recommendations(self, paper_content) -> str:
+        """默认推荐内容（当API调用失败时使用）"""
+        return """## 关系探索与智能推荐
+
+基于学术论文引用网络和语义相似度分析，为您推荐以下相关研究：
+
+### 🔬 相关论文推荐
+
+**1. 在 Semantic Scholar 上查看更多相关论文**
+- **链接**: [点击查看相关论文](https://www.semanticscholar.org/search?q={query}&sort=relevance)
+
+### 🔍 探索方式建议
+
+1. **引用网络分析**: 查看本文的参考文献和引用本文的后续研究
+2. **主题相似搜索**: 使用论文关键词在学术搜索引擎中查找相似研究
+3. **作者其他工作**: 关注本文作者的其他相关研究成果
+
+---
+""".format(query=paper_content.title.replace(' ', '+') if paper_content.title else "")
 
     def _generate_paper_info(self, paper_content) -> ArticleSection:
         """生成论文信息"""

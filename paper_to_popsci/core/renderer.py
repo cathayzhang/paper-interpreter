@@ -119,6 +119,8 @@ class HTMLRenderer:
             return self._render_conclusion_section(title, content, image_path)
         elif section_type == "paper_info":
             return self._render_paper_info_section(title, content)
+        elif section_type == "recommendations":
+            return self._render_recommendations_section(title, content, image_path)
         else:
             return self._render_standard_section(title, content, image_path)
 
@@ -321,6 +323,56 @@ class HTMLRenderer:
                 {info_html}
             </div>
         </section>"""
+
+    def _render_recommendations_section(self, title: str, content: str, image_path: Optional[str]) -> str:
+        """渲染推荐章节"""
+        content_html = self._markdown_to_html(content)
+
+        # 特殊处理推荐卡片样式
+        content_html = self._style_recommendation_cards(content_html)
+
+        return f"""
+        <section class="section py-10 recommendations">
+            <h2 class="text-3xl font-bold mb-8 pb-3 border-b-2 border-[{self.style['accent_color']}] tracking-tight"
+                style="font-family: {self.style['font_family']}; color: {self.style['text_color']}">
+                {self._escape_html(title)}
+            </h2>
+            <div class="prose prose-lg max-w-none leading-relaxed">
+                {content_html}
+            </div>
+        </section>"""
+
+    def _style_recommendation_cards(self, html: str) -> str:
+        """为推荐内容添加卡片样式"""
+        # 为推荐论文标题添加样式
+        import re
+
+        # 匹配 **数字. 标题** 格式并添加样式
+        html = re.sub(
+            r'\*\*(\d+)\.\s*([^<]+)\*\*',
+            r'<h4 class="text-xl font-bold mt-6 mb-2" style="color: {accent}">\1. \2</h4>'.format(
+                accent=self.style['accent_color']
+            ),
+            html
+        )
+
+        # 为来源标签添加样式
+        html = re.sub(
+            r'\*\*([^*]+)\*\*:',
+            r'<span class="font-bold text-gray-700">\1:</span>',
+            html
+        )
+
+        # 为链接添加样式
+        html = re.sub(
+            r'\[([^\]]+)\]\(([^)]+)\)',
+            r'<a href="\2" target="_blank" class="text-[{accent}] hover:underline">\1</a>'.format(
+                accent=self.style['accent_color']
+            ),
+            html
+        )
+
+        return html
 
     def _markdown_to_html(self, text: str) -> str:
         """简单的 Markdown 转 HTML - 清理残留格式"""
@@ -686,9 +738,8 @@ class PDFExporter:
         except Exception as e:
             logger.warning(f"Pandoc 导出失败: {e}")
 
-        # 所有方案失败，返回 HTML
-        logger.warning("所有 PDF 导出方案失败，返回 HTML 文件")
-        return html_path
+        # 所有方案失败，抛出错误
+        raise RuntimeError("所有 PDF 导出方案均失败，请安装 Playwright: pip install playwright && playwright install chromium")
 
     def _export_with_playwright(self, html_path: Path, output_path: Path) -> Path:
         """使用 Playwright 导出 PDF"""

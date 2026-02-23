@@ -1,13 +1,14 @@
 """
 Streamlit 独立部署版本
 最快上线方案，支持一键部署到 Streamlit Cloud
+修复：下载不跳转，使用 session_state 保持状态
 """
 import streamlit as st
 import tempfile
 from pathlib import Path
 import time
 import os
-import requests
+import base64
 
 from paper_to_popsci.core.downloader import PaperDownloader
 from paper_to_popsci.core.extractor import PDFExtractor
@@ -16,7 +17,9 @@ from paper_to_popsci.core.illustrator import IllustrationGenerator
 from paper_to_popsci.core.writer import ArticleWriter
 from paper_to_popsci.core.renderer import HTMLRenderer
 from paper_to_popsci.core.multi_format_exporter import MultiFormatExporter
+from paper_to_popsci.core.logger import logger
 
+# 页面配置
 st.set_page_config(
     page_title="Paper Interpreter - 论文解读专家",
     page_icon="📄",
@@ -24,34 +27,69 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# 初始化 session_state
+if 'page' not in st.session_state:
+    st.session_state.page = 'input'  # input 或 result
+if 'export_results' not in st.session_state:
+    st.session_state.export_results = None
+if 'paper_title' not in st.session_state:
+    st.session_state.paper_title = ""
+if 'illustrations' not in st.session_state:
+    st.session_state.illustrations = []
+if 'html_content' not in st.session_state:
+    st.session_state.html_content = ""
+if 'base_name' not in st.session_state:
+    st.session_state.base_name = ""
+
 # 侧边栏 - API 配置
 with st.sidebar:
     st.title("⚙️ API 配置")
     st.markdown("请输入你自己的 API Key")
-    
+
     user_api_key = st.text_input(
         "Gemini API Key",
         type="password",
         help="从 https://yunwu.ai 获取你的 API Key"
     )
-    
+
     if user_api_key:
-        # 使用用户提供的 API Key
         os.environ["GEMINI_API_KEY"] = user_api_key
         os.environ["NANO_BANANA_API_KEY"] = user_api_key
         st.success("✅ API Key 已设置")
     else:
-        # 使用默认配置（如果有）
         default_key = os.getenv("GEMINI_API_KEY", st.secrets.get("GEMINI_API_KEY", ""))
         if default_key:
             st.info("ℹ️ 使用默认配置")
         else:
             st.warning("⚠️ 请输入 API Key 以使用服务")
-    
+
+    st.divider()
+
+    # 论文推荐配置 (可选)
+    with st.expander("🔬 论文推荐配置 (可选)"):
+        st.caption("不配置也能使用！系统会自动使用免费方案")
+
+        ss_api_key = st.text_input(
+            "Semantic Scholar API Key (可选)",
+            type="password",
+            help="无需申请也能使用。提供 Key 可以获得更高请求速率。申请地址：semanticscholar.org/product/api"
+        )
+        if ss_api_key:
+            os.environ["SEMANTIC_SCHOLAR_API_KEY"] = ss_api_key
+            st.success("✅ Semantic Scholar API 已设置")
+
+        openalex_email = st.text_input(
+            "OpenAlex Email (可选)",
+            help="提供邮箱可进入'礼貌池'，获得更快访问速度"
+        )
+        if openalex_email:
+            os.environ["OPENALEX_EMAIL"] = openalex_email
+            st.success("✅ OpenAlex 已设置")
+
     st.divider()
     st.caption("你的 API Key 仅在当前会话中使用，不会被保存或分享")
 
-# 自定义样式 - 暖米色主题
+# 自定义样式
 st.markdown("""
 <style>
     .main {
@@ -64,25 +102,38 @@ st.markdown("""
         padding: 12px 24px;
         font-size: 16px;
     }
+    .stButton>button:hover {
+        background-color: #138d75;
+    }
     .stTextInput>div>div>input {
         border-radius: 8px;
         border: 2px solid #16A085;
     }
-    .result-box {
-        background-color: #F5EFE0;
-        padding: 20px;
-        border-radius: 12px;
-        border-left: 4px solid #16A085;
-        margin: 20px 0;
+    .download-btn {
+        background-color: #16A085 !important;
+        color: white !important;
     }
 </style>
 """, unsafe_allow_html=True)
 
-def main():
+
+def reset_to_home():
+    """重置到首页"""
+    st.session_state.page = 'input'
+    st.session_state.export_results = None
+    st.session_state.paper_title = ""
+    st.session_state.illustrations = []
+    st.session_state.html_content = ""
+    st.session_state.base_name = ""
+    st.rerun()
+
+
+def show_input_page():
+    """显示输入页面"""
     # Hero 区
     st.title("📄 Paper Interpreter")
-    st.markdown("### 将学术论文转换为通俗易懂的科普文章")
-    st.markdown("面向'一无所知'的小白读者，用大白话讲解复杂的学术概念")
+    st.markdown("### 让每一篇论文都值得被读懂")
+    st.markdown("AI驱动的学术论文解读，将前沿研究转化为你触手可及的知识")
 
     st.divider()
 
@@ -117,14 +168,14 @@ def main():
         if not url:
             st.error("请输入论文链接")
             return
-        
-        # 检查 API Key
+
         api_key = os.getenv("GEMINI_API_KEY", st.secrets.get("GEMINI_API_KEY", ""))
         if not api_key:
             st.error("❌ 请在侧边栏输入 API Key")
             return
 
         process_paper(url, illustration_count)
+
 
 def process_paper(url: str, illustration_count: int):
     """处理论文"""
@@ -172,18 +223,17 @@ def process_paper(url: str, illustration_count: int):
             # Step 5: 生成文章
             status_text.text("✍️ 正在撰写科普文章...")
             writer = ArticleWriter()
-            
-            # 确保 outline 是字典格式
+
             if not isinstance(outline, dict):
                 st.error("❌ 大纲格式错误")
                 return
-                
+
             article_sections = writer.write(paper_content, {"outline": outline}, illustrations)
-            
+
             if not article_sections or len(article_sections) <= 1:
                 st.error("❌ 文章生成失败，请重试")
                 return
-                
+
             progress_bar.progress(80)
 
             # Step 6: 渲染 HTML
@@ -204,72 +254,104 @@ def process_paper(url: str, illustration_count: int):
             )
             progress_bar.progress(100)
 
-            # 显示结果
+            # 读取文件内容到内存
+            timestamp = time.strftime("%Y%m%d_%H%M%S")
+            safe_title = "".join(c for c in paper_content.title if c.isalnum() or c in (' ', '-', '_')).strip()
+            safe_title = safe_title[:50]
+            base_name = f"{safe_title}_{timestamp}" if safe_title else f"paper_{timestamp}"
+
+            # 保存到 session_state
+            st.session_state.paper_title = paper_content.title
+            st.session_state.illustrations = illustrations
+            st.session_state.base_name = base_name
+            st.session_state.export_results = {}
+            st.session_state.export_paths = {}  # 保存路径用于调试
+
+            # 读取文件内容
+            for fmt, path in export_results.items():
+                if not path or not Path(path).exists():
+                    logger.warning(f"导出文件不存在，跳过: {fmt}")
+                    continue
+                st.session_state.export_paths[fmt] = str(path)
+                if fmt in ['html', 'md']:
+                    with open(path, "r", encoding="utf-8") as f:
+                        st.session_state.export_results[fmt] = f.read()
+                else:
+                    # 二进制文件：直接读取字节，不转base64
+                    with open(path, "rb") as f:
+                        st.session_state.export_results[fmt] = f.read()
+
+            # 读取 HTML 用于预览
+            with open(export_results['html'], "r", encoding="utf-8") as f:
+                st.session_state.html_content = f.read()
+
+            # 切换到结果页面
+            st.session_state.page = 'result'
             status_text.empty()
             progress_bar.empty()
-
-            show_results(paper_content, export_results, illustrations)
+            st.rerun()
 
         except Exception as e:
             st.error(f"❌ 处理失败: {str(e)}")
             raise
 
-def show_results(paper_content, export_results, illustrations):
-    """显示结果"""
-    st.success(f"✅ 《{paper_content.title}》解读完成！")
+
+def show_result_page():
+    """显示结果页面 - 下载不会跳转"""
+    st.title("📄 Paper Interpreter")
+    st.success(f"✅ 《{st.session_state.paper_title}》解读完成！")
 
     # 统计信息
-    success_images = len([i for i in illustrations if i.get("success")])
+    success_images = len([i for i in st.session_state.illustrations if i.get("success")])
+    available_formats = len(st.session_state.export_results) if st.session_state.export_results else 0
 
     col1, col2, col3 = st.columns(3)
     with col1:
         st.metric("配图生成", f"{success_images} 张")
     with col2:
-        word_count = len(paper_content.title) if paper_content.title else 0
-        st.metric("论文标题", f"{word_count} 字")
-    with col3:
         st.metric("处理状态", "完成")
+    with col3:
+        st.metric("可用格式", f"{available_formats} 种")
 
-    # 下载按钮
+    st.divider()
+
+    # 返回首页按钮
+    if st.button("🏠 返回首页（处理新论文）", type="secondary", use_container_width=True):
+        reset_to_home()
+        return
+
     st.divider()
     st.markdown("### 📥 下载结果（多种格式）")
 
-    # 生成文件名基础：论文标题_时间戳
-    import time
-    timestamp = time.strftime("%Y%m%d_%H%M%S")
-    # 清理标题中的特殊字符
-    safe_title = "".join(c for c in paper_content.title if c.isalnum() or c in (' ', '-', '_')).strip()
-    safe_title = safe_title[:50]  # 限制长度
-    base_name = f"{safe_title}_{timestamp}" if safe_title else f"paper_{timestamp}"
+    export_results = st.session_state.export_results
+    base_name = st.session_state.base_name
 
     col1, col2 = st.columns(2)
 
     # HTML 下载
     if 'html' in export_results:
         with col1:
-            with open(export_results['html'], "r", encoding="utf-8") as f:
-                html_data = f.read()
             st.download_button(
                 label="🌐 下载 HTML 网页版",
-                data=html_data,
+                data=export_results['html'],
                 file_name=f"{base_name}.html",
                 mime="text/html",
                 use_container_width=True,
-                help="在浏览器中打开，支持术语悬停提示"
+                help="在浏览器中打开，支持术语悬停提示",
+                key="download_html"
             )
 
     # Markdown 下载
     if 'md' in export_results:
         with col2:
-            with open(export_results['md'], "r", encoding="utf-8") as f:
-                md_data = f.read()
             st.download_button(
                 label="📝 下载 Markdown",
-                data=md_data,
+                data=export_results['md'],
                 file_name=f"{base_name}.md",
                 mime="text/markdown",
                 use_container_width=True,
-                help="Markdown 格式，可在各种编辑器中打开"
+                help="Markdown 格式，可在各种编辑器中打开",
+                key="download_md"
             )
 
     col3, col4 = st.columns(2)
@@ -277,30 +359,40 @@ def show_results(paper_content, export_results, illustrations):
     # PDF 下载
     if 'pdf' in export_results:
         with col3:
-            with open(export_results['pdf'], "rb") as f:
-                pdf_data = f.read()
+            pdf_data = export_results['pdf']
+            # 如果是字节数据直接使用，否则解码base64
+            if isinstance(pdf_data, str):
+                pdf_data = base64.b64decode(pdf_data)
             st.download_button(
                 label="📄 下载 PDF",
                 data=pdf_data,
                 file_name=f"{base_name}.pdf",
                 mime="application/pdf",
                 use_container_width=True,
-                help="PDF 文档，适合打印和分享，包含图片"
+                help="PDF 文档，适合打印和分享，包含图片",
+                key="download_pdf"
             )
 
     # Word 下载
     if 'docx' in export_results:
         with col4:
-            with open(export_results['docx'], "rb") as f:
-                docx_data = f.read()
+            docx_data = export_results['docx']
+            # 如果是字节数据直接使用，否则解码base64
+            if isinstance(docx_data, str):
+                docx_data = base64.b64decode(docx_data)
             st.download_button(
                 label="📘 下载 Word",
                 data=docx_data,
                 file_name=f"{base_name}.docx",
                 mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                 use_container_width=True,
-                help="Microsoft Word 文档，包含图片，适合手机查看"
+                help="Microsoft Word 文档，包含图片，适合手机查看",
+                key="download_docx"
             )
+
+    # PDF 导出失败提示
+    if 'pdf' not in export_results:
+        st.warning("⚠️ PDF 导出失败。如需 PDF 格式，请确保 Playwright 已安装：\n\n`pip install playwright && playwright install chromium`")
 
     # 移动端推荐提示
     st.info("📱 **手机用户推荐**: 下载 Word (.docx) 格式，可在手机上用 WPS、Office 等应用打开，图片显示更友好")
@@ -309,23 +401,32 @@ def show_results(paper_content, export_results, illustrations):
     st.divider()
     st.markdown("### 👁️ 文章预览")
 
-    # 使用 iframe 显示 HTML 预览
-    if 'html' in export_results:
-        with open(export_results['html'], "r", encoding="utf-8") as f:
-            html_content = f.read()
-
-        # 显示 HTML 内容（使用 components）
+    if st.session_state.html_content:
         import streamlit.components.v1 as components
-        components.html(html_content, height=600, scrolling=True)
+        components.html(st.session_state.html_content, height=800, scrolling=True)
 
     # 显示生成的配图
-    if any(i.get("success") for i in illustrations):
+    if any(i.get("success") for i in st.session_state.illustrations):
         st.divider()
         st.markdown("### 🖼️ 生成的配图")
 
-        for ill in illustrations:
+        for ill in st.session_state.illustrations:
             if ill.get("success") and ill.get("filepath"):
                 st.image(ill["filepath"], caption=ill.get("section", ""))
+
+    # 底部返回按钮
+    st.divider()
+    if st.button("🏠 返回首页（处理新论文）", type="secondary", use_container_width=True, key="bottom_home"):
+        reset_to_home()
+
+
+def main():
+    """主函数 - 根据状态显示不同页面"""
+    if st.session_state.page == 'input':
+        show_input_page()
+    else:
+        show_result_page()
+
 
 if __name__ == "__main__":
     main()
