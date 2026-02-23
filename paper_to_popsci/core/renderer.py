@@ -420,7 +420,15 @@ class HTMLRenderer:
         def format_subsection(match):
             emoji = match.group(1)
             text = match.group(2)
-            return f'<div style="border-top: 2px solid rgba(0,0,0,0.08); margin-top: 2rem; margin-bottom: 1rem; padding-top: 1rem;"></div><h3 class="text-xl font-bold mb-4" style="color: {accent};">{emoji} {text}</h3>'
+            # Emoji 映射为 PDF 友好的文字
+            emoji_map = {
+                '🔬': '【研究】',
+                '📚': '【文献】',
+                '🔍': '【探索】',
+                '💡': '【建议】'
+            }
+            label = emoji_map.get(emoji, '')
+            return f'<div style="border-top: 2px solid rgba(0,0,0,0.08); margin-top: 2rem; margin-bottom: 1rem; padding-top: 1rem;"></div><h3 class="text-xl font-bold mb-4" style="color: {accent};">{label} {text}</h3>'
 
         html = re.sub(
             r'<p[^>]*>(?:<strong>)?(🔬|📚|🔍|💡)\s*([^<]+?)(?:</strong>)?</p>',
@@ -852,9 +860,7 @@ class PDFExporter:
                         "bottom": "2.5cm",
                         "left": "2.5cm"
                     },
-                    display_header_footer=True,
-                    header_template='<div style="font-size: 9px; width: 100%; text-align: center; color: #666;">Paper Interpreter</div>',
-                    footer_template='<div style="font-size: 9px; width: 100%; text-align: center; color: #666;">第 <span class="pageNumber"></span> 页</div>'
+                    print_background=True
                 )
 
                 browser.close()

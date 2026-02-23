@@ -460,8 +460,8 @@ class PaperRecommender:
                         lines.append(f"- **说明**: {paper.reason}")
                 else:
                     # 实际论文推荐
-                    lines.append(f"**{i}. {paper.title}** ({paper.year})")
-                    lines.append("")
+                    year_str = f" ({paper.year})" if paper.year > 0 else ""
+                    lines.append(f"**{i}. {paper.title}**{year_str}"); lines.append("")
                     if paper.authors:
                         lines.append(f"**作者**: {', '.join(paper.authors)}")
                         lines.append("")
@@ -500,13 +500,15 @@ class PaperRecommender:
             if citing:
                 lines.append("**引用该论文的研究：**")
                 for paper in citing[:3]:
-                    lines.append(f"- [{paper.title}]({paper.url}) ({paper.year})")
+                    year_str = f" ({paper.year})" if paper.year > 0 else ""
+                    lines.append(f"- [{paper.title}]({paper.url}){year_str}")
                 lines.append("")
 
             if referenced:
                 lines.append("**该论文引用的前期工作：**")
                 for paper in referenced[:3]:
-                    lines.append(f"- [{paper.title}]({paper.url}) ({paper.year})")
+                    year_str = f" ({paper.year})" if paper.year > 0 else ""
+                    lines.append(f"- [{paper.title}]({paper.url}){year_str}")
                 lines.append("")
 
         # 3. 手动探索建议
