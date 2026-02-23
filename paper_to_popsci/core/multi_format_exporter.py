@@ -451,6 +451,10 @@ class MultiFormatExporter:
         from docx.enum.text import WD_ALIGN_PARAGRAPH
         import re
 
+        # 调试日志
+        logger.debug(f"推荐章节内容长度: {len(content)} 字符")
+        logger.debug(f"推荐章节内容预览: {content[:500]}...")
+
         # 分隔线
         doc.add_paragraph()
         doc.add_paragraph("_" * 60)
@@ -464,6 +468,7 @@ class MultiFormatExporter:
 
         # 处理内容
         lines = content.split('\n')
+        processed_count = 0
         i = 0
         while i < len(lines):
             line = lines[i].strip()
@@ -480,11 +485,11 @@ class MultiFormatExporter:
             if '一键解读' in line or '📄' in line:
                 continue
 
-            # 处理子标题 (### 🔬 相关论文推荐)
+            # 处理子标题 (### 🔬 相关论文推荐、### 📚 引用网络 等)
             if line.startswith('###'):
                 sub_title = line.replace('###', '').strip()
-                # 移除emoji
-                sub_title = sub_title.replace('🔬', '').replace('📚', '').replace('🔍', '').strip()
+                # 移除所有常见emoji
+                sub_title = sub_title.replace('🔬', '').replace('📚', '').replace('🔍', '').replace('💡', '').strip()
 
                 sub_para = doc.add_paragraph()
                 sub_run = sub_para.add_run(sub_title)
@@ -551,9 +556,25 @@ class MultiFormatExporter:
                     value_run.font.size = Pt(10)
                 continue
 
-            # 处理引用网络列表项 (- [Title](url) (year))
+            # 处理子标题（如：**引用该论文的研究：**）
+            # 使用正则表达式精确匹配只有标题没有值的情况（支持中英文冒号）
+            subheading_match = re.match(r'\*\*([^:*]+?)\*\*[:：]\s*$', line)
+            if subheading_match:
+                sub_heading = subheading_match.group(1).strip()
+                sub_para = doc.add_paragraph()
+                sub_run = sub_para.add_run(sub_heading)
+                sub_run.font.name = 'Noto Sans SC'
+                sub_run.font.size = Pt(10)
+                sub_run.font.bold = True
+                sub_run.font.color.rgb = RGBColor(44, 62, 80)
+                sub_para.paragraph_format.space_before = Pt(6)
+                sub_para.paragraph_format.space_after = Pt(3)
+                continue
+
+            # 处理引用网络列表项 (- [Title](url) 或 - [Title](url) (year))
             if line.startswith('- ['):
-                link_match = re.search(r'- \[([^\]]+)\]\(([^)]+)\)\s*\((\d{4})\)?', line)
+                # 支持可选的年份: - [Title](url) 或 - [Title](url) (year)
+                link_match = re.search(r'- \[([^\]]+)\]\(([^)]+)\)(?:\s*\((\d{4})\))?', line)
                 if link_match:
                     title_text = link_match.group(1)
                     url = link_match.group(2)
@@ -571,7 +592,15 @@ class MultiFormatExporter:
                     # 添加超链接
                     display_text = f"{title_text} ({year})" if year else title_text
                     self._add_hyperlink(item_para, display_text, url)
+                    processed_count += 1
+                else:
+                    logger.debug(f"未匹配的引用行: {line[:100]}")
                 continue
+
+            # 记录未处理的行（用于调试）
+            logger.debug(f"推荐章节未处理的行: {line[:100]}")
+
+        logger.debug(f"推荐章节处理了 {processed_count} 个条目")
 
     def _clean_markdown_for_word(self, text: str) -> str:
         """清理 Markdown 标记以便 Word 显示 - 完全版本"""
