@@ -19,6 +19,45 @@ from paper_to_popsci.core.renderer import HTMLRenderer
 from paper_to_popsci.core.multi_format_exporter import MultiFormatExporter
 from paper_to_popsci.core.logger import logger
 
+# 自动安装 Playwright Chromium（如果未安装）
+# Streamlit Cloud 部署时需要系统依赖，请确保 packages.txt 中包含必要的系统库
+@st.cache_resource
+def install_playwright():
+    """检查并安装 Playwright Chromium"""
+    try:
+        from playwright.sync_api import sync_playwright
+        # 检测是否已安装 Chromium
+        import subprocess
+        result = subprocess.run(['playwright', 'chromium', '--version'],
+                              capture_output=True, text=True, timeout=30)
+        if result.returncode == 0:
+            logger.info(f"Chromium 已安装: {result.stdout}")
+            return True
+    except Exception:
+        pass
+
+    # 尝试安装 Chromium
+    try:
+        import subprocess
+        logger.info("正在安装 Chromium...")
+        result = subprocess.run(['playwright', 'install', 'chromium'],
+                              capture_output=True, text=True, timeout=300)
+        if result.returncode == 0:
+            logger.info("Chromium 安装成功")
+            return True
+        else:
+            logger.warning(f"Chromium 安装失败: {result.stderr}")
+            return False
+    except Exception as e:
+        logger.warning(f"Chromium 安装错误: {e}")
+        return False
+
+# 尝试安装 Chromium（不阻塞启动）
+try:
+    install_playwright()
+except Exception as e:
+    logger.warning(f"自动安装 Chromium 失败: {e}")
+
 # 页面配置
 st.set_page_config(
     page_title="Paper Interpreter - 论文解读专家",
