@@ -449,6 +449,7 @@ class MultiFormatExporter:
         """添加推荐章节到 Word - 参考论文信息排版风格"""
         from docx.shared import Pt, RGBColor, Inches
         from docx.enum.text import WD_ALIGN_PARAGRAPH
+        import re
 
         # 分隔线
         doc.add_paragraph()
@@ -463,15 +464,20 @@ class MultiFormatExporter:
 
         # 处理内容
         lines = content.split('\n')
-        current_paper = None  # 当前处理的论文
+        i = 0
+        while i < len(lines):
+            line = lines[i].strip()
+            i += 1
 
-        for line in lines:
-            line = line.strip()
             if not line:
                 continue
 
             # 跳过说明文字、分隔线
             if '基于学术论文引用网络' in line or line == '---':
+                continue
+
+            # 跳过一键解读链接
+            if '一键解读' in line or '📄' in line:
                 continue
 
             # 处理子标题 (### 🔬 相关论文推荐)
@@ -488,85 +494,65 @@ class MultiFormatExporter:
                 sub_run.font.color.rgb = RGBColor(22, 160, 133)
                 sub_para.paragraph_format.space_before = Pt(8)
                 sub_para.paragraph_format.space_after = Pt(4)
+                continue
 
             # 处理论文标题（**1. Title** (2024)）
-            elif re.match(r'\*\*\d+\.', line):
-                match = re.match(r'\*\*(\d+)\.\s*([^*]+?)\*\*\s*\((\d{4})\)', line)
-                if match:
-                    num, paper_title, year = match.groups()
+            title_match = re.match(r'\*\*(\d+)\.\s*([^*]+?)\*\*\s*\((\d{4})\)', line)
+            if title_match:
+                num, paper_title, year = title_match.groups()
 
-                    # 论文标题作为一个段落
-                    title_para = doc.add_paragraph()
-                    title_para.paragraph_format.space_before = Pt(8)
-                    title_para.paragraph_format.space_after = Pt(4)
+                # 论文标题作为一个段落
+                title_para = doc.add_paragraph()
+                title_para.paragraph_format.space_before = Pt(8)
+                title_para.paragraph_format.space_after = Pt(4)
 
-                    num_run = title_para.add_run(f"{num}. ")
-                    num_run.font.name = 'Noto Sans SC'
-                    num_run.font.size = Pt(10)
-                    num_run.font.bold = True
-                    num_run.font.color.rgb = RGBColor(22, 160, 133)
+                num_run = title_para.add_run(f"{num}. ")
+                num_run.font.name = 'Noto Sans SC'
+                num_run.font.size = Pt(10)
+                num_run.font.bold = True
+                num_run.font.color.rgb = RGBColor(22, 160, 133)
 
-                    title_run = title_para.add_run(f"{paper_title} ({year})")
-                    title_run.font.name = 'Noto Serif SC'
-                    title_run.font.size = Pt(10)
-                    title_run.font.bold = True
+                title_run = title_para.add_run(f"{paper_title} ({year})")
+                title_run.font.name = 'Noto Serif SC'
+                title_run.font.size = Pt(10)
+                title_run.font.bold = True
+                continue
 
-            # 处理列表项 - 使用标签: 值的格式
-            elif line.startswith('- **'):
-                clean_line = line.replace('- **', '').strip()
+            # 处理 **标签**: 值 格式（作者、简介、链接、推荐理由等）
+            label_match = re.match(r'\*\*([^*]+)\*\*:\s*(.+)', line)
+            if label_match:
+                label = label_match.group(1).strip()
+                value = label_match.group(2).strip()
 
-                # 跳过一键解读链接
-                if '一键解读' in clean_line or '📄' in clean_line:
+                # 跳过一键解读
+                if '一键解读' in label:
                     continue
 
-                # 处理 [text](url) 链接格式
-                link_match = re.search(r'\[([^\]]+)\]\(([^)]+)\)', clean_line)
+                item_para = doc.add_paragraph()
+                item_para.paragraph_format.space_after = Pt(3)
+                item_para.paragraph_format.left_indent = Inches(0.2)
+
+                # 标签加粗
+                label_run = item_para.add_run(f"{label}: ")
+                label_run.font.name = 'Noto Sans SC'
+                label_run.font.size = Pt(10)
+                label_run.font.bold = True
+
+                # 处理值（可能包含链接）
+                link_match = re.search(r'\[([^\]]+)\]\(([^)]+)\)', value)
                 if link_match:
-                    # 提取标签（链接前的文字）
-                    label_text = clean_line[:link_match.start()].replace('**', '').strip()
                     link_text = link_match.group(1)
                     link_url = link_match.group(2)
-
-                    # 移除末尾的冒号
-                    label_text = label_text.rstrip(':').strip()
-
-                    item_para = doc.add_paragraph()
-                    item_para.paragraph_format.space_after = Pt(3)
-                    item_para.paragraph_format.left_indent = Inches(0.2)
-
-                    # 标签加粗
-                    if label_text:
-                        label_run = item_para.add_run(f"{label_text}: ")
-                        label_run.font.name = 'Noto Sans SC'
-                        label_run.font.size = Pt(10)
-                        label_run.font.bold = True
-
-                    # 添加超链接
                     self._add_hyperlink(item_para, link_text, link_url)
                 else:
-                    # 无链接的普通文本
-                    clean_line = clean_line.replace('**', '')
-                    if ':' in clean_line:
-                        parts = clean_line.split(':', 1)
-                        label = parts[0].strip()
-                        value = parts[1].strip() if len(parts) > 1 else ""
-
-                        item_para = doc.add_paragraph()
-                        item_para.paragraph_format.space_after = Pt(3)
-                        item_para.paragraph_format.left_indent = Inches(0.2)
-
-                        label_run = item_para.add_run(f"{label}: ")
-                        label_run.font.name = 'Noto Sans SC'
-                        label_run.font.size = Pt(10)
-                        label_run.font.bold = True
-
-                        if value:
-                            value_run = item_para.add_run(value)
-                            value_run.font.name = 'Noto Sans SC'
-                            value_run.font.size = Pt(10)
+                    # 普通文本值
+                    value_run = item_para.add_run(value)
+                    value_run.font.name = 'Noto Sans SC'
+                    value_run.font.size = Pt(10)
+                continue
 
             # 处理引用网络列表项 (- [Title](url) (year))
-            elif line.startswith('- ['):
+            if line.startswith('- ['):
                 link_match = re.search(r'- \[([^\]]+)\]\(([^)]+)\)\s*\((\d{4})\)?', line)
                 if link_match:
                     title_text = link_match.group(1)
@@ -585,29 +571,7 @@ class MultiFormatExporter:
                     # 添加超链接
                     display_text = f"{title_text} ({year})" if year else title_text
                     self._add_hyperlink(item_para, display_text, url)
-
-            # 处理推荐理由等普通段落
-            elif line.startswith('**') and '推荐理由' in line:
-                clean_line = line.replace('**', '')
-                if ':' in clean_line:
-                    parts = clean_line.split(':', 1)
-                    label = parts[0].strip()
-                    value = parts[1].strip() if len(parts) > 1 else ""
-
-                    reason_para = doc.add_paragraph()
-                    reason_para.paragraph_format.space_after = Pt(3)
-                    reason_para.paragraph_format.left_indent = Inches(0.2)
-
-                    label_run = reason_para.add_run(f"{label}: ")
-                    label_run.font.name = 'Noto Sans SC'
-                    label_run.font.size = Pt(10)
-                    label_run.font.bold = True
-
-                    if value:
-                        value_run = reason_para.add_run(value)
-                        value_run.font.name = 'Noto Sans SC'
-                        value_run.font.size = Pt(10)
-                        value_run.font.italic = True
+                continue
 
     def _clean_markdown_for_word(self, text: str) -> str:
         """清理 Markdown 标记以便 Word 显示 - 完全版本"""

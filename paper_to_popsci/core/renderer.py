@@ -367,13 +367,15 @@ class HTMLRenderer:
             label = match.group(1)
             content = match.group(2).strip()
 
-            # 特殊处理"一键解读"按钮 - 跳过，让 _apply_inline_formatting 处理
-            if "一键解读" in label or "📄" in label:
-                # 返回空，这个按钮会在 _apply_inline_formatting 中正确处理
-                return ''
-
             # 处理包含链接的内容
             if '<a' in content:
+                # 为"链接"标签添加复制按钮
+                if label == "链接":
+                    # 提取 URL
+                    url_match = re.search(r'href="([^"]+)"', content)
+                    if url_match:
+                        url = url_match.group(1)
+                        return f'    <div style="margin-bottom: 10px; line-height: 1.6;"><span style="font-weight: 600; color: #374151;">{label}:</span> {content}<button onclick="navigator.clipboard.writeText(\'{url}\');this.textContent=\'已复制!\';setTimeout(()=>this.textContent=\'复制链接\',2000);" style="margin-left:8px;padding:2px 8px;background:#16A085;color:white;border:none;border-radius:4px;cursor:pointer;font-size:12px;">复制链接</button></div>'
                 return f'    <div style="margin-bottom: 10px; line-height: 1.6;"><span style="font-weight: 600; color: #374151;">{label}:</span> {content}</div>'
 
             return f'    <div style="margin-bottom: 10px; line-height: 1.6; color: #4b5563;"><span style="font-weight: 600; color: #374151;">{label}:</span> {content}</div>'
@@ -508,23 +510,14 @@ class HTMLRenderer:
         # 处理术语注解 *术语（解释）* -> 转换为专业格式
         text = self._process_term_annotations(text)
 
-        # 处理一键解读链接 [text](interpret://url) -> 特殊按钮样式
+        # 处理 interpret:// 链接 - 直接显示为普通文本或转换为目标URL
         def replace_interpret_link(match):
             link_text = match.group(1)
-            # 移除可能存在的图标，避免重复
-            link_text_clean = link_text.replace('📄 ', '').replace('📄', '')
             encoded_url = match.group(2).replace('interpret://', '')
-            # 解码URL用于显示
+            # 解码URL
             actual_url = encoded_url.replace('%2F', '/').replace('%3A', ':')
-            # 提取arXiv ID用于跳转
-            arxiv_match = re.search(r'arxiv\.org/abs/(\d+\.\d+)', actual_url)
-            if arxiv_match:
-                arxiv_id = arxiv_match.group(1)
-                # 生成HTML按钮，点击后跳转到主站并自动开始解读
-                return f'''<a href="https://paper-interpreter.streamlit.app/?arxiv={arxiv_id}" class="interpret-btn" style="display:inline-block;padding:8px 16px;background:#16A085;color:white;text-decoration:none;border-radius:6px;font-weight:500;box-shadow:0 2px 4px rgba(0,0,0,0.1);margin:4px 0;" target="_blank">📄 {link_text_clean}</a>'''
-            else:
-                # 非arXiv链接，使用原链接
-                return f'''<a href="{actual_url}" class="interpret-btn" style="display:inline-block;padding:8px 16px;background:#16A085;color:white;text-decoration:none;border-radius:6px;font-weight:500;box-shadow:0 2px 4px rgba(0,0,0,0.1);margin:4px 0;" target="_blank">📄 {link_text_clean}</a>'''
+            # 只返回链接文本，不生成按钮
+            return f'<a href="{actual_url}" target="_blank" style="color: {self.style["accent_color"]};">{link_text}</a>'
 
         text = re.sub(r'\[([^\]]+)\]\(interpret://([^)]+)\)', replace_interpret_link, text)
 
