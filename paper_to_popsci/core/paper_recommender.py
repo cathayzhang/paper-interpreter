@@ -420,9 +420,14 @@ class PaperRecommender:
             return abstract
         return abstract[:max_length].rsplit(" ", 1)[0] + "..."
 
-    def format_for_article(self, recommendations: Dict[str, List[RelatedPaper]]) -> str:
-        """将推荐结果格式化为文章 markdown 格式"""
+    def format_for_article(self, recommendations: Dict[str, List[RelatedPaper]]) -> tuple[str, List[Dict[str, str]]]:
+        """将推荐结果格式化为文章 markdown 格式
+
+        Returns:
+            (content, recommended_papers): 格式化的内容和推荐论文列表
+        """
         lines = []
+        recommended_papers = []  # 存储推荐论文的URL和标题
         # 注意：章节标题由 renderer 处理，这里不需要添加 ## 标题
 
         has_recommendations = any(
@@ -469,9 +474,15 @@ class PaperRecommender:
                     if paper.url:
                         lines.append(f"**链接**: [点击查看详情]({paper.url})")
                         lines.append("")
-                        # 添加论文解读按钮链接
-                        lines.append(f"**[📄 一键解读这篇论文]({paper.url})**")
+                        # 添加一键解读提示（在前端会显示为按钮）
+                        lines.append(f"📄 *一键解读: {paper.title}*")
                         lines.append("")
+                        # 保存到推荐列表
+                        recommended_papers.append({
+                            "title": paper.title,
+                            "url": paper.url,
+                            "year": str(paper.year) if paper.year else ""
+                        })
                     if paper.pdf_url:
                         lines.append(f"**PDF**: [免费下载]({paper.pdf_url})")
                         lines.append("")
@@ -514,4 +525,4 @@ class PaperRecommender:
         lines.append("---")
         lines.append("")
 
-        return "\n".join(lines)
+        return "\n".join(lines), recommended_papers

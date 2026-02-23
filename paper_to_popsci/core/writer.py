@@ -19,6 +19,7 @@ class ArticleSection:
     title: str
     content: str
     image_path: Optional[str] = None
+    recommended_papers: Optional[List[Dict[str, str]]] = None  # 推荐论文列表
 
 
 class ArticleWriter:
@@ -378,15 +379,17 @@ class ArticleWriter:
                 doi=paper_content.doi,
                 limit=8
             )
-            content = recommender.format_for_article(recommendations)
+            content, recommended_papers = recommender.format_for_article(recommendations)
         except Exception as e:
             logger.warning(f"论文推荐生成失败: {e}")
             content = self._get_default_recommendations(paper_content)
+            recommended_papers = []
 
         return ArticleSection(
             section_type="recommendations",
             title="关系探索与智能推荐",
-            content=content
+            content=content,
+            recommended_papers=recommended_papers
         )
 
     def _get_default_recommendations(self, paper_content) -> str:

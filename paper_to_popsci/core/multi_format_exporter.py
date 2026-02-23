@@ -205,17 +205,21 @@ class MultiFormatExporter:
         doc.add_paragraph()
 
     def _add_section_to_docx(self, doc: 'Document', title: str, content: str, image_path: Optional[str]):
-        """添加标准章节到 Word"""
+        """添加标准章节到 Word - 优化排版"""
         from docx.shared import Inches, Pt, RGBColor
         from docx.enum.text import WD_ALIGN_PARAGRAPH
 
-        # 章节标题
+        # 章节标题 - 使用更大的字体和更好的样式
         heading = doc.add_heading(level=2)
+        heading.alignment = WD_ALIGN_PARAGRAPH.LEFT
         heading_run = heading.add_run(title)
         heading_run.font.name = 'Noto Serif SC'
-        heading_run.font.size = Pt(18)
-        heading_run.font.color.rgb = RGBColor(44, 62, 80)
+        heading_run.font.size = Pt(20)
+        heading_run.font.color.rgb = RGBColor(22, 160, 133)  # 使用主题绿色
         heading_run.font.bold = True
+        heading.paragraph_format.space_before = Pt(24)
+        heading.paragraph_format.space_after = Pt(12)
+        heading.paragraph_format.keep_with_next = True  # 与下一段保持在一起
 
         # 处理内容 - 清理 Markdown
         clean_content = self._clean_markdown_for_word(content)
@@ -227,34 +231,39 @@ class MultiFormatExporter:
             if not para_text:
                 continue
 
-            # 处理术语注解
-            para_text = self._process_terms_for_word(para_text)
-
             para = doc.add_paragraph()
-            para.paragraph_format.line_spacing = 1.8
-            para.paragraph_format.space_after = Pt(12)
+            para.paragraph_format.line_spacing = 1.6  # 适当的行距
+            para.paragraph_format.space_after = Pt(10)
+            para.paragraph_format.first_line_indent = Inches(0.3)  # 首行缩进
 
-            # 简单处理：直接添加文本
-            run = para.add_run(para_text)
-            run.font.name = 'Noto Sans SC'
-            run.font.size = Pt(11)
+            # 处理术语注解和加粗文本
+            self._add_formatted_text_to_para(para, para_text)
 
-        # 添加图片
+        # 添加图片 - 更好的布局
         if image_path and Path(image_path).exists():
             try:
-                doc.add_paragraph()  # 空行
+                # 在图片前添加分隔空间
+                doc.add_paragraph()
+
+                # 图片容器段落
                 img_para = doc.add_paragraph()
                 img_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                img_para.paragraph_format.space_before = Pt(12)
+                img_para.paragraph_format.space_after = Pt(6)
+
                 run = img_para.add_run()
+                # 根据图片比例调整宽度，最大5.5英寸
                 run.add_picture(str(image_path), width=Inches(5.5))
 
-                # 图片说明
+                # 图片说明 - 更好的样式
                 caption = doc.add_paragraph()
                 caption.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                cap_run = caption.add_run(f"图：{title}")
+                caption.paragraph_format.space_after = Pt(12)
+
+                cap_run = caption.add_run(f"▲ 图：{title}")
+                cap_run.font.name = 'Noto Sans SC'
                 cap_run.font.size = Pt(9)
-                cap_run.font.italic = True
-                cap_run.font.color.rgb = RGBColor(128, 128, 128)
+                cap_run.font.color.rgb = RGBColor(108, 117, 125)  # 灰色
 
                 doc.add_paragraph()  # 空行
             except Exception as e:
@@ -308,17 +317,29 @@ class MultiFormatExporter:
                     value_run.font.size = Pt(10)
 
     def _add_recommendations_to_docx(self, doc: 'Document', title: str, content: str):
-        """添加推荐章节到 Word"""
+        """添加推荐章节到 Word - 优化卡片式排版"""
         from docx.shared import Pt, RGBColor, Inches
         from docx.enum.text import WD_ALIGN_PARAGRAPH
+        from docx.enum.table import WD_TABLE_ALIGNMENT
+
+        # 章节分隔
+        doc.add_paragraph()
+        separator = doc.add_paragraph("─" * 50)
+        separator.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        separator_run = separator.runs[0]
+        separator_run.font.color.rgb = RGBColor(200, 200, 200)
+        doc.add_paragraph()
 
         # 标题
         heading = doc.add_heading(level=2)
+        heading.alignment = WD_ALIGN_PARAGRAPH.LEFT
         heading_run = heading.add_run(title)
         heading_run.font.name = 'Noto Serif SC'
-        heading_run.font.size = Pt(18)
-        heading_run.font.color.rgb = RGBColor(44, 62, 80)
+        heading_run.font.size = Pt(20)
+        heading_run.font.color.rgb = RGBColor(22, 160, 133)
         heading_run.font.bold = True
+        heading.paragraph_format.space_before = Pt(12)
+        heading.paragraph_format.space_after = Pt(12)
 
         # 说明文字
         intro_para = doc.add_paragraph()
@@ -435,6 +456,62 @@ class MultiFormatExporter:
             return f"{term}（{explanation}）"
 
         return re.sub(pattern, replace_term, text)
+
+    def _add_formatted_text_to_para(self, para, text: str):
+        """向段落添加格式化文本（支持加粗、术语高亮）"""
+        from docx.shared import Pt, RGBColor
+
+        # 处理术语注解 *术语（解释）*
+        term_pattern = r'\*([^*（]+?)（(.+?)）\*'
+
+        # 分割文本：普通文本、加粗文本 **text**、术语 *text、*
+        parts = []
+        last_end = 0
+
+        # 找到所有加粗和术语模式
+        patterns = [
+            (r'\*\*(.+?)\*\*', 'bold'),  # 加粗
+            (term_pattern, 'term'),  # 术语注解
+        ]
+
+        for pattern, ptype in patterns:
+            for match in re.finditer(pattern, text):
+                # 添加之前的普通文本
+                if match.start() > last_end:
+                    parts.append((text[last_end:match.start()], 'normal'))
+
+                if ptype == 'bold':
+                    parts.append((match.group(1), 'bold'))
+                elif ptype == 'term':
+                    term = match.group(1)
+                    explanation = match.group(2)
+                    parts.append((f"{term}（{explanation}）", 'term'))
+
+                last_end = match.end()
+
+        # 添加剩余文本
+        if last_end < len(text):
+            parts.append((text[last_end:], 'normal'))
+
+        # 如果没有找到任何格式，直接添加整体文本
+        if not parts:
+            parts = [(text, 'normal')]
+
+        # 添加到段落
+        for content, style in parts:
+            if not content:
+                continue
+            run = para.add_run(content)
+            run.font.name = 'Noto Sans SC'
+            run.font.size = Pt(11)
+
+            if style == 'bold':
+                run.font.bold = True
+                run.font.color.rgb = RGBColor(44, 62, 80)
+            elif style == 'term':
+                # 术语使用绿色高亮
+                run.font.color.rgb = RGBColor(22, 160, 133)
+                run.font.bold = True
 
     def _export_markdown(self, article_sections, paper_content, output_dir: Path) -> Path:
         """导出 Markdown（包含 base64 图片）"""

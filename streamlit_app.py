@@ -40,6 +40,10 @@ if 'html_content' not in st.session_state:
     st.session_state.html_content = ""
 if 'base_name' not in st.session_state:
     st.session_state.base_name = ""
+if 'recommended_papers' not in st.session_state:
+    st.session_state.recommended_papers = []
+if 'paper_url' not in st.session_state:
+    st.session_state.paper_url = ""
 
 # 侧边栏 - API 配置
 with st.sidebar:
@@ -140,11 +144,17 @@ def show_input_page():
     # 输入区
     col1, col2 = st.columns([3, 1])
     with col1:
+        # 如果有预设的URL（来自推荐论文），则使用它
+        default_url = st.session_state.get("paper_url", "")
         url = st.text_input(
             "论文链接",
+            value=default_url,
             placeholder="https://arxiv.org/abs/2312.00752",
             help="支持 arXiv、DOI、OpenReview、Semantic Scholar 等"
         )
+        # 清空预设URL，避免重复
+        if default_url:
+            st.session_state.paper_url = ""
     with col2:
         illustration_count = st.selectbox(
             "配图数量",
@@ -233,6 +243,13 @@ def process_paper(url: str, illustration_count: int):
             if not article_sections or len(article_sections) <= 1:
                 st.error("❌ 文章生成失败，请重试")
                 return
+
+            # 收集推荐论文列表
+            recommended_papers = []
+            for section in article_sections:
+                if section.section_type == "recommendations" and section.recommended_papers:
+                    recommended_papers.extend(section.recommended_papers)
+            st.session_state.recommended_papers = recommended_papers
 
             progress_bar.progress(80)
 
@@ -407,6 +424,39 @@ def show_result_page():
 
     # 移动端推荐提示
     st.info("📱 **手机用户推荐**: 下载 Word (.docx) 格式，可在手机上用 WPS、Office 等应用打开，图片显示更友好")
+
+    # 显示推荐论文（可点击解读）
+    if st.session_state.get("recommended_papers"):
+        st.divider()
+        st.markdown("### 📚 推荐论文（点击解读）")
+        st.caption("点击下方按钮，快速解读相关论文")
+
+        papers = st.session_state.recommended_papers[:5]  # 最多显示5篇
+        cols = st.columns(min(len(papers), 3))  # 每行最多3个按钮
+
+        for idx, paper in enumerate(papers):
+            with cols[idx % 3]:
+                paper_title = paper.get("title", "未知论文")[:30] + "..." if len(paper.get("title", "")) > 30 else paper.get("title", "未知论文")
+                paper_url = paper.get("url", "")
+                if paper_url and st.button(
+                    f"📄 {paper_title}",
+                    key=f"interpret_paper_{idx}",
+                    use_container_width=True,
+                    help=f"解读《{paper.get('title', '')}》"
+                ):
+                    # 设置URL并开始解读
+                    st.session_state.paper_url = paper_url
+                    st.session_state.page = 'input'
+                    st.rerun()
+
+        with st.expander("🔗 复制推荐论文链接"):
+            for idx, paper in enumerate(papers):
+                st.text_input(
+                    f"论文 {idx + 1}",
+                    value=paper.get("url", ""),
+                    key=f"paper_url_{idx}",
+                    label_visibility="visible"
+                )
 
     # 文章预览
     st.divider()
