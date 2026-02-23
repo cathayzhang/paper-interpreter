@@ -826,7 +826,19 @@ class PDFExporter:
             from playwright.sync_api import sync_playwright
 
             with sync_playwright() as p:
-                browser = p.chromium.launch()
+                # Streamlit Cloud 需要特殊启动参数
+                browser = p.chromium.launch(
+                    headless=True,
+                    args=[
+                        '--no-sandbox',
+                        '--disable-setuid-sandbox',
+                        '--disable-dev-shm-usage',
+                        '--disable-gpu',
+                        '--no-first-run',
+                        '--no-zygote',
+                        '--single-process',
+                    ]
+                )
                 page = browser.new_page()
                 page.goto(f"file://{html_path.absolute()}")
                 page.wait_for_load_state("networkidle")
@@ -850,8 +862,12 @@ class PDFExporter:
             logger.info(f"PDF 导出成功 (Playwright): {output_path}")
             return output_path
 
-        except ImportError:
-            raise RuntimeError("Playwright 未安装")
+        except ImportError as e:
+            logger.warning(f"Playwright 导入失败: {e}")
+            raise RuntimeError(f"Playwright 未安装: {e}")
+        except Exception as e:
+            logger.warning(f"Playwright PDF 导出错误: {e}")
+            raise
 
     def _export_with_weasyprint(self, html_path: Path, output_path: Path) -> Path:
         """使用 WeasyPrint 导出 PDF"""

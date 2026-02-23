@@ -21,44 +21,79 @@ from paper_to_popsci.core.logger import logger
 
 # 自动安装 Playwright Chromium（如果未安装）
 # Streamlit Cloud 部署时需要系统依赖，请确保 packages.txt 中包含必要的系统库
-@st.cache_resource
-def install_playwright():
-    """检查并安装 Playwright Chromium"""
-    try:
-        from playwright.sync_api import sync_playwright
-        # 检测是否已安装 Chromium
-        import subprocess
-        result = subprocess.run(['playwright', 'chromium', '--version'],
-                              capture_output=True, text=True, timeout=30)
-        if result.returncode == 0:
-            logger.info(f"Chromium 已安装: {result.stdout}")
-            return True
-    except Exception:
-        pass
+import os
+import glob
+import subprocess
 
-    # 尝试安装 Chromium
+def check_chromium_installed():
+    """检查 Chromium 是否已安装"""
+    cache_dir = os.path.expanduser("~/.cache/ms-playwright")
+    if not os.path.exists(cache_dir):
+        return False
+
+    # 查找 chromium 目录
+    chromium_dirs = glob.glob(os.path.join(cache_dir, "chromium-*"))
+    for chromium_dir in chromium_dirs:
+        # 检查可执行文件
+        chrome_path = os.path.join(chromium_dir, "chrome-linux", "chrome")
+        if os.path.exists(chrome_path):
+            return True
+        # macOS 路径
+        chrome_path = os.path.join(chromium_dir, "chrome-mac", "Chromium.app")
+        if os.path.exists(chrome_path):
+            return True
+    return False
+
+def install_chromium():
+    """安装 Chromium 浏览器"""
+    if check_chromium_installed():
+        logger.info("Chromium 已安装，跳过安装")
+        return True
+
+    logger.info("正在安装 Chromium（首次运行需要几分钟）...")
+
     try:
-        import subprocess
-        logger.info("正在安装 Chromium...")
-        result = subprocess.run(['playwright', 'install', 'chromium'],
-                              capture_output=True, text=True, timeout=300)
+        # 方法1: 使用 playwright 命令行
+        result = subprocess.run(
+            ["python", "-m", "playwright", "install", "chromium"],
+            capture_output=True,
+            text=True,
+            timeout=300
+        )
         if result.returncode == 0:
             logger.info("Chromium 安装成功")
             return True
         else:
-            logger.warning(f"Chromium 安装失败: {result.stderr}")
-            return False
+            logger.warning(f"playwright 命令安装失败: {result.stderr}")
     except Exception as e:
-        logger.warning(f"Chromium 安装错误: {e}")
-        return False
+        logger.warning(f"playwright 命令安装错误: {e}")
 
-# 尝试安装 Chromium（不阻塞启动）
+    try:
+        # 方法2: 使用 subprocess 直接调用
+        result = subprocess.run(
+            ["playwright", "install", "chromium"],
+            capture_output=True,
+            text=True,
+            timeout=300
+        )
+        if result.returncode == 0:
+            logger.info("Chromium 安装成功")
+            return True
+    except Exception as e:
+        logger.warning(f"playwright 直接调用安装错误: {e}")
+
+    logger.error("Chromium 安装失败，PDF 导出功能将不可用")
+    return False
+
+# 尝试安装 Chromium（同步执行，确保在启动前完成）
+chromium_ready = False
 try:
-    install_playwright()
+    chromium_ready = install_chromium()
 except Exception as e:
     logger.warning(f"自动安装 Chromium 失败: {e}")
+    chromium_ready = False
 
-# 页面配置
+# 页面配置（必须是第一个 Streamlit 命令）
 st.set_page_config(
     page_title="Paper Interpreter - 论文解读专家",
     page_icon="📄",
@@ -131,6 +166,13 @@ with st.sidebar:
 
     st.divider()
     st.caption("你的 API Key 仅在当前会话中使用，不会被保存或分享")
+
+    # Chromium 状态显示
+    st.divider()
+    if chromium_ready or check_chromium_installed():
+        st.success("✅ Chromium 已就绪，支持 PDF 导出")
+    else:
+        st.warning("⚠️ Chromium 未安装，PDF 导出可能不可用")
 
 # 自定义样式
 st.markdown("""
