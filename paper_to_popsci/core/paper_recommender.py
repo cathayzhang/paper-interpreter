@@ -474,8 +474,9 @@ class PaperRecommender:
                     if paper.url:
                         lines.append(f"**链接**: [点击查看详情]({paper.url})")
                         lines.append("")
-                        # 添加一键解读提示（在前端会显示为按钮）
-                        lines.append(f"📄 *一键解读: {paper.title}*")
+                        # 添加一键解读链接（使用特殊协议 interpret://）
+                        encoded_url = paper.url.replace('/', '%2F').replace(':', '%3A')
+                        lines.append(f"**[📄 一键解读](interpret://{encoded_url})**")
                         lines.append("")
                         # 保存到推荐列表
                         recommended_papers.append({

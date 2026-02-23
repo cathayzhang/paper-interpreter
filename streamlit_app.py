@@ -170,6 +170,8 @@ def show_input_page():
         - **DOI**: `https://doi.org/10.1109/TPAMI.2016.2577031`
         - **OpenReview**: `https://openreview.net/forum?id=xxxxx`
         - **Semantic Scholar**: `https://www.semanticscholar.org/paper/xxxxx`
+        - **CVPR/CVF**: `https://openaccess.thecvf.com/content/...`
+        - **Google Scholar**: `https://scholar.google.com/...`
         - **直接 PDF**: 以 `.pdf` 结尾的链接
         """)
 
@@ -485,9 +487,34 @@ def show_result_page():
         reset_to_home()
 
 
+def check_interpret_url():
+    """检查是否有从"一键解读"传递过来的URL"""
+    # 从查询参数中获取
+    query_params = st.query_params
+    if "interpret_url" in query_params:
+        encoded_url = query_params["interpret_url"]
+        # 解码URL
+        actual_url = encoded_url.replace('%2F', '/').replace('%3A', ':')
+        # 清空查询参数
+        st.query_params.clear()
+        # 设置URL并开始解读
+        st.session_state.paper_url = actual_url
+        return actual_url
+    return None
+
 def main():
     """主函数 - 根据状态显示不同页面"""
+    # 检查是否有一键解读的URL
+    interpret_url = check_interpret_url()
+
     if st.session_state.page == 'input':
+        # 如果有解释URL，自动开始处理
+        if interpret_url:
+            # 确保API Key已设置
+            api_key = os.getenv("GEMINI_API_KEY", st.secrets.get("GEMINI_API_KEY", ""))
+            if api_key:
+                process_paper(interpret_url, 3)  # 默认3张配图
+                return
         show_input_page()
     else:
         show_result_page()

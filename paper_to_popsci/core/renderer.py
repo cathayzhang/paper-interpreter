@@ -502,8 +502,20 @@ class HTMLRenderer:
         import re
         # 处理术语注解 *术语（解释）* -> 转换为专业格式
         text = self._process_term_annotations(text)
-        # 处理链接 [text](url)
-        text = re.sub(r'\[([^\]]+)\]\(([^)]+)\)', r'<a href="\2" target="_blank" class="hover:underline" style="color: ' + self.style['accent_color'] + r'">\1</a>', text)
+
+        # 处理一键解读链接 [text](interpret://url) -> 特殊按钮样式
+        def replace_interpret_link(match):
+            link_text = match.group(1)
+            encoded_url = match.group(2).replace('interpret://', '')
+            # 解码URL
+            actual_url = encoded_url.replace('%2F', '/').replace('%3A', ':')
+            # 生成HTML按钮，点击后通过JavaScript设置localStorage并跳转
+            return f'''<a href="?interpret_url={encoded_url}" class="interpret-btn" style="display:inline-block;padding:8px 16px;background:#16A085;color:white;text-decoration:none;border-radius:6px;font-weight:500;box-shadow:0 2px 4px rgba(0,0,0,0.1);margin:4px 0;">📄 {link_text}</a>'''
+
+        text = re.sub(r'\[([^\]]+)\]\(interpret://([^)]+)\)', replace_interpret_link, text)
+
+        # 处理普通链接 [text](url)
+        text = re.sub(r'\[([^\]]+)\]\((?!interpret://)([^)]+)\)', r'<a href="\2" target="_blank" class="hover:underline" style="color: ' + self.style['accent_color'] + r'">\1</a>', text)
         # 处理加粗 **text**
         text = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', text)
         # 处理斜体 *text* (剩余的)

@@ -129,6 +129,45 @@ class MultiFormatExporter:
         title_style.font.color.rgb = RGBColor(44, 62, 80)  # #2C3E50
         title_style.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
+        # 收集章节信息用于目录
+        toc_entries = []
+        for section in article_sections:
+            if section.section_type not in ['hero', 'paper_info']:
+                toc_entries.append(section.title)
+
+        # 添加目录
+        if toc_entries:
+            toc_heading = doc.add_paragraph()
+            toc_heading.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            toc_run = toc_heading.add_run('目录')
+            toc_run.font.name = 'Noto Serif SC'
+            toc_run.font.size = Pt(18)
+            toc_run.font.bold = True
+            toc_run.font.color.rgb = RGBColor(22, 160, 133)
+            toc_heading.paragraph_format.space_after = Pt(12)
+
+            for i, entry in enumerate(toc_entries, 1):
+                toc_item = doc.add_paragraph()
+                toc_item.paragraph_format.left_indent = Inches(0.5)
+                toc_item.paragraph_format.space_after = Pt(4)
+
+                num_run = toc_item.add_run(f'{i}. ')
+                num_run.font.name = 'Noto Sans SC'
+                num_run.font.size = Pt(11)
+                num_run.font.color.rgb = RGBColor(22, 160, 133)
+
+                entry_run = toc_item.add_run(entry)
+                entry_run.font.name = 'Noto Sans SC'
+                entry_run.font.size = Pt(11)
+
+            # 添加分隔线
+            doc.add_paragraph()
+            separator = doc.add_paragraph('─' * 50)
+            separator.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            sep_run = separator.runs[0]
+            sep_run.font.color.rgb = RGBColor(200, 200, 200)
+            doc.add_paragraph()
+
         # 处理每个章节
         for section in article_sections:
             section_type = section.section_type
@@ -149,6 +188,76 @@ class MultiFormatExporter:
         docx_path = output_dir / "article.docx"
         doc.save(str(docx_path))
         return docx_path
+
+    def _add_hyperlink(self, paragraph, text: str, url: str):
+        """在段落中添加可点击的超链接"""
+        from docx.oxml.shared import qn
+        from docx.oxml import OxmlElement
+
+        # 创建超链接元素
+        hyperlink = OxmlElement('w:hyperlink')
+        hyperlink.set(qn('r:id'), self._create_relationship(paragraph.part, url))
+
+        # 创建 run 元素
+        run = OxmlElement('w:r')
+        rPr = OxmlElement('w:rPr')
+
+        # 设置颜色
+        color = OxmlElement('w:color')
+        color.set(qn('w:val'), '16A085')  # 绿色
+        rPr.append(color)
+
+        # 下划线
+        u = OxmlElement('w:u')
+        u.set(qn('w:val'), 'single')
+        rPr.append(u)
+
+        run.append(rPr)
+        t = OxmlElement('w:t')
+        t.text = text
+        run.append(t)
+
+        hyperlink.append(run)
+        paragraph._p.append(hyperlink)
+
+    def _create_relationship(self, part, url: str) -> str:
+        """创建关系ID用于超链接"""
+        from docx.opc.constants import RELATIONSHIP_TYPE as RT
+
+        r_id = part.relate_to(url, RT.HYPERLINK, is_external=True)
+        return r_id
+
+    def _extract_and_add_links(self, paragraph, text: str):
+        """提取文本中的链接并添加为可点击超链接"""
+        import re
+
+        # 匹配 [text](url) 格式
+        link_pattern = r'\[([^\]]+)\]\(([^)]+)\)'
+
+        last_end = 0
+        for match in re.finditer(link_pattern, text):
+            # 添加链接前的文本
+            if match.start() > last_end:
+                pre_text = text[last_end:match.start()]
+                if pre_text:
+                    run = paragraph.add_run(pre_text)
+                    run.font.name = 'Noto Sans SC'
+                    run.font.size = Pt(10)
+
+            # 添加超链接
+            link_text = match.group(1)
+            link_url = match.group(2)
+            self._add_hyperlink(paragraph, link_text, link_url)
+
+            last_end = match.end()
+
+        # 添加剩余文本
+        if last_end < len(text):
+            remaining = text[last_end:]
+            if remaining:
+                run = paragraph.add_run(remaining)
+                run.font.name = 'Noto Sans SC'
+                run.font.size = Pt(10)
 
     def _add_hero_to_docx(self, doc: 'Document', title: str, content: str, image_path: Optional[str]):
         """添加 Hero 区到 Word"""
@@ -392,58 +501,127 @@ class MultiFormatExporter:
                     title_run.font.size = Pt(12)
                     title_run.font.bold = True
 
-            # 处理列表项
+            # 处理列表项 - 支持超链接
             elif line.startswith('- **'):
-                clean_line = line.replace('- **', '').replace('**', '', 1).strip()
-                if ':' in clean_line:
-                    label, value = clean_line.split(':', 1)
+                clean_line = line.replace('- **', '').strip()
+                # 处理 [text](url) 链接
+                link_match = re.search(r'\[([^\]]+)\]\(([^)]+)\)', clean_line)
+                if link_match:
+                    label_text = clean_line[:link_match.start()].replace('**', '').strip()
+                    link_text = link_match.group(1)
+                    link_url = link_match.group(2)
+
                     item_para = doc.add_paragraph()
-                    item_para.paragraph_format.left_indent = Inches(0.3)
                     item_para.paragraph_format.space_after = Pt(3)
 
-                    label_run = item_para.add_run(f"{label}: ")
-                    label_run.font.name = 'Noto Sans SC'
-                    label_run.font.size = Pt(10)
-                    label_run.font.bold = True
+                    if label_text:
+                        label_run = item_para.add_run(f"{label_text} ")
+                        label_run.font.name = 'Noto Sans SC'
+                        label_run.font.size = Pt(10)
+                        label_run.font.bold = True
 
-                    value_run = item_para.add_run(value.strip())
-                    value_run.font.name = 'Noto Sans SC'
-                    value_run.font.size = Pt(10)
+                    # 添加超链接
+                    self._add_hyperlink(item_para, link_text, link_url)
+                else:
+                    # 无链接的普通列表项
+                    clean_line = clean_line.replace('**', '').strip()
+                    if ':' in clean_line:
+                        label, value = clean_line.split(':', 1)
+                        item_para = doc.add_paragraph()
+                        item_para.paragraph_format.space_after = Pt(3)
 
-            # 处理普通段落
+                        label_run = item_para.add_run(f"{label}: ")
+                        label_run.font.name = 'Noto Sans SC'
+                        label_run.font.size = Pt(10)
+                        label_run.font.bold = True
+
+                        value_run = item_para.add_run(value.strip())
+                        value_run.font.name = 'Noto Sans SC'
+                        value_run.font.size = Pt(10)
+
+            # 处理普通段落 - 支持超链接
             elif line and not line.startswith('#'):
-                para = doc.add_paragraph()
-                para.paragraph_format.left_indent = Inches(0.3)
-                para.paragraph_format.space_after = Pt(4)
+                # 检查是否包含链接
+                link_match = re.search(r'\[([^\]]+)\]\(([^)]+)\)', line)
+                if link_match:
+                    para = doc.add_paragraph()
+                    para.paragraph_format.space_after = Pt(4)
+                    self._extract_and_add_links(para, line)
+                else:
+                    para = doc.add_paragraph()
+                    para.paragraph_format.space_after = Pt(4)
 
-                run = para.add_run(line)
-                run.font.name = 'Noto Sans SC'
-                run.font.size = Pt(10)
+                    clean_line = line.replace('**', '').replace('*', '').strip()
+                    run = para.add_run(clean_line)
+                    run.font.name = 'Noto Sans SC'
+                    run.font.size = Pt(10)
 
     def _clean_markdown_for_word(self, text: str) -> str:
-        """清理 Markdown 标记以便 Word 显示"""
+        """清理 Markdown 标记以便 Word 显示 - 完全版本"""
+        import re
+
         # 移除代码块标记
         text = re.sub(r'```\w*\n?', '', text)
         text = re.sub(r'```', '', text)
 
-        # 将加粗 **text** 转换为普通文本（Word 会处理）
-        text = re.sub(r'\*\*(.+?)\*\*', r'\1', text)
+        # 移除行内代码标记
+        text = re.sub(r'`([^`]+)`', r'\1', text)
 
-        # 将斜体 *text* 转换为普通文本
-        text = re.sub(r'\*(.+?)\*', r'\1', text)
+        # 移除 Markdown 标题标记
+        text = re.sub(r'^#{1,6}\s*', '', text, flags=re.MULTILINE)
 
-        # 将列表标记转换为中文数字
+        # 移除水平分隔线
+        text = re.sub(r'\n---\n', '\n', text)
+        text = re.sub(r'^---+$', '', text, flags=re.MULTILINE)
+
+        # 处理链接 - 保留文本，移除 URL 部分
+        # [text](url) -> text
+        text = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', text)
+
+        # 移除表情符号前的标记
+        text = re.sub(r'^(###|##|#)\s*', '', text, flags=re.MULTILINE)
+
+        # 处理列表标记 - 简化为普通文本
         lines = text.split('\n')
         result_lines = []
-        for i, line in enumerate(lines):
+        for line in lines:
+            original = line
             line = line.strip()
+
+            # 跳过空行
+            if not line:
+                result_lines.append('')
+                continue
+
+            # 处理列表项
             if line.startswith('- ') or line.startswith('* '):
-                line = f"• {line[2:]}"
-            elif re.match(r'^\d+\.', line):
-                line = line
+                line = line[2:].strip()
+            elif re.match(r'^\d+\.[\s\u3000]+', line):
+                # 数字列表保留数字，去掉多余空格
+                line = re.sub(r'^(\d+)\.\s+', r'\1. ', line)
+
+            # 处理加粗标记 **text**
+            line = re.sub(r'\*\*([^*]+)\*\*', r'\1', line)
+
+            # 处理斜体标记 *text*
+            line = re.sub(r'\*([^*]+)\*', r'\1', line)
+
+            # 移除前导空格
+            line = line.lstrip()
+
             result_lines.append(line)
 
-        return '\n\n'.join(result_lines)
+        # 合并连续的空行
+        final_lines = []
+        prev_empty = False
+        for line in result_lines:
+            is_empty = not line.strip()
+            if is_empty and prev_empty:
+                continue
+            final_lines.append(line)
+            prev_empty = is_empty
+
+        return '\n'.join(final_lines)
 
     def _process_terms_for_word(self, text: str) -> str:
         """处理术语注解为 Word 友好格式"""

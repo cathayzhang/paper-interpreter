@@ -61,6 +61,8 @@ class PaperDownloader:
             pdf_path, metadata = self._download_semanticscholar(url, output_dir)
         elif link_type == "googlescholar":
             pdf_path, metadata = self._download_googlescholar(url, output_dir)
+        elif link_type == "thecvf":
+            pdf_path, metadata = self._download_thecvf(url, output_dir)
         else:
             # 通用下载方案
             pdf_path, metadata = self._download_generic(url, output_dir)
@@ -88,6 +90,8 @@ class PaperDownloader:
             return "semanticscholar"
         elif "scholar.google.com" in url_lower or "google.com/scholar" in url_lower:
             return "googlescholar"
+        elif "openaccess.thecvf.com" in url_lower or "thecvf.com" in url_lower:
+            return "thecvf"
         elif url_lower.endswith(".pdf"):
             return "pdf_direct"
         else:
@@ -486,6 +490,84 @@ class PaperDownloader:
         except Exception as e:
             logger.warning(f"Google Scholar 处理失败: {e}")
             raise RuntimeError(f"无法从 Google Scholar 链接下载论文: {e}")
+
+    def _download_thecvf(self, url: str, output_dir: Path) -> Tuple[Path, dict]:
+        """下载 OpenAccess CVF (CVPR/ICCV) 论文
+
+        从 HTML 页面中提取 PDF 链接并下载
+        """
+        logger.info(f"处理 OpenAccess CVF 链接: {url}")
+        metadata = {"source_url": url}
+
+        try:
+            # 获取 HTML 页面
+            response = self.session.get(url, timeout=Config.DEFAULT_TIMEOUT_SECONDS)
+            response.raise_for_status()
+
+            # 从 HTML 中提取 PDF 链接
+            # 常见的模式:
+            # <a href="...paper.pdf">PDF</a>
+            # <a id="pdf" href="...">...</a>
+            pdf_patterns = [
+                r'<a[^>]*href="([^"]+\.pdf)"[^>]*>\s*PDF\s*</a>',
+                r'<a[^>]*id=["\']?pdf["\']?[^>]*href="([^"]+)"',
+                r'href="(/content/[^"]+\.pdf)"',
+                r'href="(https://openaccess\.thecvf\.com/content/[^"]+\.pdf)"',
+            ]
+
+            pdf_url = None
+            for pattern in pdf_patterns:
+                match = re.search(pattern, response.text, re.IGNORECASE)
+                if match:
+                    pdf_url = match.group(1)
+                    # 如果是相对路径，转换为绝对路径
+                    if pdf_url.startswith('/'):
+                        pdf_url = f"https://openaccess.thecvf.com{pdf_url}"
+                    logger.info(f"找到 PDF 链接: {pdf_url}")
+                    break
+
+            if not pdf_url:
+                logger.warning("无法从 CVF 页面提取 PDF 链接")
+                raise RuntimeError(
+                    "无法从该页面提取 PDF 链接。\n"
+                    "建议直接复制 PDF 链接（通常在页面右侧有 PDF 按钮）"
+                )
+
+            # 生成文件名
+            parsed = urlparse(url)
+            filename = Path(unquote(parsed.path)).name
+            if filename.endswith('.html'):
+                filename = filename[:-5] + '.pdf'
+            else:
+                filename = f"thecvf_{int(time.time())}.pdf"
+
+            pdf_path = output_dir / filename
+
+            # 下载 PDF
+            self._download_file(pdf_url, pdf_path)
+
+            # 尝试提取元数据（标题等）
+            try:
+                title_match = re.search(r'<div[^>]*class=["\']?papertitle["\']?[^>]*>(.*?)</div>', response.text, re.DOTALL | re.IGNORECASE)
+                if title_match:
+                    title = re.sub(r'<[^>]+>', '', title_match.group(1)).strip()
+                    metadata["title"] = title
+                    logger.info(f"提取到标题: {title}")
+
+                # 提取作者
+                authors_match = re.search(r'<i>(.*?)</i>', response.text, re.DOTALL)
+                if authors_match:
+                    authors_html = authors_match.group(1)
+                    authors = [a.strip() for a in re.sub(r'<[^>]+>', '', authors_html).split(',')]
+                    metadata["authors"] = authors
+            except Exception as e:
+                logger.warning(f"提取元数据失败: {e}")
+
+            return pdf_path, metadata
+
+        except Exception as e:
+            logger.warning(f"OpenAccess CVF 下载失败: {e}")
+            raise RuntimeError(f"无法从 OpenAccess CVF 下载论文: {e}")
 
     def _download_generic(self, url: str, output_dir: Path, metadata: Optional[dict] = None) -> Tuple[Path, dict]:
         """通用下载方案"""
