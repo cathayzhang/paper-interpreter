@@ -184,6 +184,22 @@ async def download_result(task_id: str, filename: str):
     raise HTTPException(status_code=501, detail="请配置文件存储服务 (S3/阿里云OSS)")
 
 
+@app.get("/")
+async def root():
+    """API 根路径 - 欢迎页面"""
+    return {
+        "message": "Paper Interpreter API",
+        "version": "2.0.0",
+        "docs": "/docs",
+        "health": "/api/health",
+        "endpoints": {
+            "interpret_paper": "POST /api/paper/interpret",
+            "get_status": "GET /api/paper/status/{task_id}",
+            "download": "GET /api/paper/download/{task_id}/{filename}"
+        }
+    }
+
+
 @app.get("/api/health")
 async def health_check():
     """健康检查"""
