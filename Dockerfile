@@ -17,12 +17,12 @@ COPY . .
 # Create output directory
 RUN mkdir -p /app/paper_outputs
 
-# Expose port
+# Expose port (Render uses $PORT environment variable)
 EXPOSE 8000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost:8000/api/health || exit 1
+# Health check disabled (Render has its own health check)
+# HEALTHCHECK not needed as Render uses healthCheckPath in render.yaml
 
 # Run with uvicorn
-CMD ["uvicorn", "web_api:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
+# Note: Render will override this with startCommand from render.yaml
+CMD ["sh", "-c", "uvicorn web_api:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1"]
