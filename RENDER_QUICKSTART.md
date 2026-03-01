@@ -2,15 +2,29 @@
 
 本指南介绍如何将 Paper Interpreter API 部署到 Render，获得一个可公开访问的 API 地址。
 
+## ⚠️ 重要提示
+
+由于本项目包含完整的 PDF 导出功能（Playwright + Chromium），Docker 镜像较大（约 1GB），构建时间较长（15-20 分钟）。
+
+**推荐方案：**
+1. **Render Starter 计划**（$7/月）：512MB RAM，足够运行完整功能
+2. **Railway**（https://railway.app）：更适合 Docker 部署，免费额度 $5/月
+3. **Fly.io**（https://fly.io）：免费计划支持较大镜像
+
+如果坚持使用 Render 免费计划，请注意：
+- 首次部署需要 15-20 分钟
+- 服务会在 15 分钟无活动后休眠
+- 内存限制可能导致大论文处理失败
+
 ## 前置要求
 
 - GitHub 账号
-- Render 账号（免费）：https://render.com
+- Render 账号：https://render.com
 - 云雾 AI API Key（用于调用 Gemini 模型）
 
 ---
 
-## 推荐方式：手动创建 Web Service
+## 部署步骤
 
 ### 步骤 1：确保代码已推送到 GitHub
 

@@ -2,8 +2,8 @@ FROM python:3.10-slim
 
 WORKDIR /app
 
-# Install minimal system dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Install system dependencies for WeasyPrint and PDF processing
+RUN apt-get update && apt-get install -y \
     build-essential \
     libffi-dev \
     libpango-1.0-0 \
@@ -12,12 +12,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libcairo2 \
     libxml2 \
     fonts-dejavu-core \
+    fonts-wqy-microhei \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements and install Python packages
-COPY requirements-render.txt .
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements-render.txt
+# Install Python dependencies
+COPY requirements-full.txt .
+RUN pip install --no-cache-dir -r requirements-full.txt
+
+# Download Playwright browsers (for PDF export fallback)
+RUN playwright install chromium
 
 # Copy application code
 COPY . .
@@ -25,8 +28,8 @@ COPY . .
 # Create output directory
 RUN mkdir -p /app/paper_outputs
 
-# Expose port
-EXPOSE 8000
+# Expose ports (8000 for API, 8501 for Streamlit)
+EXPOSE 8000 8501
 
-# Start the API server
+# Default command (can be overridden)
 CMD ["uvicorn", "web_api:app", "--host", "0.0.0.0", "--port", "8000"]
