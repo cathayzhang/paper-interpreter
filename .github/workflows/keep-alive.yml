@@ -1,0 +1,23 @@
+name: Keep Render Service Alive
+
+on:
+  schedule:
+    # 每 10 分钟运行一次（GitHub Actions 最短间隔 5 分钟）
+    - cron: '*/10 * * * *'
+  workflow_dispatch: # 允许手动触发
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping API Health Endpoint
+        run: |
+          echo "Pinging Render service..."
+          response=$(curl -s -o /dev/null -w "%{http_code}" https://paper-interpreter-api.onrender.com/api/health)
+          echo "Response code: $response"
+          if [ $response -eq 200 ]; then
+            echo "✅ Service is alive"
+          else
+            echo "⚠️ Service returned $response (might be waking up)"
+          fi
+        continue-on-error: true

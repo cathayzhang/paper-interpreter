@@ -2,25 +2,14 @@ FROM python:3.10-slim
 
 WORKDIR /app
 
-# Install system dependencies for WeasyPrint and PDF processing
+# Install minimal system dependencies
 RUN apt-get update && apt-get install -y \
-    build-essential \
-    libffi-dev \
-    libpango-1.0-0 \
-    libpangocairo-1.0-0 \
-    libgdk-pixbuf-2.0-0 \
-    libcairo2 \
-    libxml2 \
-    fonts-dejavu-core \
-    fonts-wqy-microhei \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies
-COPY requirements-full.txt .
-RUN pip install --no-cache-dir -r requirements-full.txt
-
-# Download Playwright browsers (for PDF export fallback)
-RUN playwright install chromium
+# Copy requirements first for better caching
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
 COPY . .
@@ -28,8 +17,12 @@ COPY . .
 # Create output directory
 RUN mkdir -p /app/paper_outputs
 
-# Expose ports (8000 for API, 8501 for Streamlit)
-EXPOSE 8000 8501
+# Expose port
+EXPOSE 8000
 
-# Default command (can be overridden)
-CMD ["uvicorn", "web_api:app", "--host", "0.0.0.0", "--port", "8000"]
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD curl -f http://localhost:8000/api/health || exit 1
+
+# Run with uvicorn
+CMD ["uvicorn", "web_api:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]

@@ -19,3 +19,7 @@ services:
       - key: ILLUSTRATION_COUNT
         value: "5"
     healthCheckPath: /api/health
+    # 优化启动配置
+    startCommand: uvicorn web_api:app --host 0.0.0.0 --port $PORT --workers 1 --timeout-keep-alive 30
+    # 增加超时时间
+    maxShutdownDelaySeconds: 30

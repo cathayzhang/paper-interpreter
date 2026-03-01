@@ -1,0 +1,67 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info
+dist
+build
+.pytest_cache
+.coverage
+
+# Virtual environments
+venv
+env
+ENV
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# Output files
+paper_outputs
+*.pdf
+*.html
+*.docx
+*.md
+
+# Documentation
+*.md
+!README.md
+DEPLOY.md
+FEATURE_SUMMARY.md
+USER_GUIDE.md
+TEST_MATRIX.md
+
+# Test files
+tests
+*_test.py
+test_*.py
+
+# Snapshots
+.snapshots
+
+# Local config
+.env.local
+.claude
+
+# Images
+*.png
+*.jpg
+*.jpeg
+*.gif
+
+# Other
+问题
+风格参考
+流程图.png
