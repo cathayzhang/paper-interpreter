@@ -21,3 +21,7 @@ playwright>=1.40.0
 
 # Streamlit
 streamlit>=1.28.0
+
+# FastAPI (用于 web_api.py)
+fastapi>=0.104.0
+uvicorn>=0.24.0
