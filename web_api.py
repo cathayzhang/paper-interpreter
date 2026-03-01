@@ -200,9 +200,9 @@ async def root():
     }
 
 
-@app.get("/api/health")
+@app.api_route("/api/health", methods=["GET", "HEAD"])
 async def health_check():
-    """健康检查"""
+    """健康检查（GET/HEAD，供 UptimeRobot 等监控保活）"""
     return {"status": "ok", "version": "2.0.0"}
 
 
