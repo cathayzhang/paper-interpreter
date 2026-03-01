@@ -8,48 +8,73 @@
 - Render 账号（免费）：https://render.com
 - 云雾 AI API Key（用于调用 Gemini 模型）
 
-## 方式一：使用蓝图一键部署（推荐）
+---
 
-### 步骤 1：推送代码到 GitHub
+## 推荐方式：手动创建 Web Service
 
-确保你的项目已经推送到 GitHub，并且根目录包含 `render.yaml` 文件。
+### 步骤 1：确保代码已推送到 GitHub
 
-```bash
-cd /Users/chuangyangyang/Documents/GitHub/论文解读
-git add .
-git commit -m "Add Render deployment configuration"
-git push origin main
-```
+确保你的项目已经推送到 GitHub 仓库：`cathayzhang/paper-interpreter`
 
-### 步骤 2：在 Render 创建蓝图部署
+### 步骤 2：在 Render 创建 Web Service
 
 1. 登录 [Render Dashboard](https://dashboard.render.com)
-2. 点击 **New** → **Blueprint**
-3. 选择你的 GitHub 仓库（例如：`cathayzhang/paper-interpreter`）
-4. Render 会自动检测 `render.yaml` 并显示部署配置
-5. 点击 **Apply** 开始部署
+2. 点击 **New** → **Web Service**
+3. 点击 **Connect a repository** 或选择已连接的 GitHub 账号
+4. 找到并选择仓库：`cathayzhang/paper-interpreter`
+5. 点击 **Connect**
 
-### 步骤 3：配置环境变量
+### 步骤 3：配置服务基本信息
 
-部署创建后，进入服务页面：
+在配置页面填写以下信息：
 
-1. 点击服务名称 `paper-interpreter-api`
-2. 进入 **Environment** 标签
-3. 添加必需的环境变量：
-   - `GEMINI_API_KEY`: 你的云雾 AI API Key（例如：`sk-BK9ckovYrzkgvOiuBtqa3h7U5aw4sVMoPSc6lcIOykBRPvkS`）
-   - `NANO_BANANA_API_KEY`: 同上（用于图片生成）
-4. 点击 **Save Changes**
+- **Name**: `paper-interpreter-api`（或你喜欢的名称）
+- **Region**: 选择 `Singapore` 或离你最近的区域
+- **Branch**: `main`
+- **Root Directory**: 留空（因为 Dockerfile 在根目录）
+- **Environment**: 选择 `Docker`
+- **Instance Type**: 选择 `Free`
 
-服务会自动重新部署。
+### 步骤 4：配置环境变量
 
-### 步骤 4：获取 API 地址
+向下滚动到 **Environment Variables** 部分，点击 **Add Environment Variable**，添加以下变量：
 
-部署完成后，你会看到服务 URL，例如：
+| Key | Value |
+|-----|-------|
+| `GEMINI_API_KEY` | `sk-BK9ckovYrzkgvOiuBtqa3h7U5aw4sVMoPSc6lcIOykBRPvkS` |
+| `NANO_BANANA_API_KEY` | `sk-BK9ckovYrzkgvOiuBtqa3h7U5aw4sVMoPSc6lcIOykBRPvkS` |
+| `GEMINI_API_URL` | `https://yunwu.ai` |
+| `NANO_BANANA_API_URL` | `https://yunwu.ai` |
+| `GEMINI_MODEL` | `gemini-flash-lite-latest` |
+| `NANO_BANANA_MODEL` | `gemini-3-pro-image-preview` |
+| `ILLUSTRATION_COUNT` | `5` |
+
+### 步骤 5：配置高级选项（可选）
+
+- **Auto-Deploy**: 保持开启（代码推送时自动部署）
+- **Health Check Path**: `/api/health`
+
+### 步骤 6：创建服务
+
+点击页面底部的 **Create Web Service** 按钮。
+
+Render 会开始构建和部署你的应用，这个过程大约需要 5-10 分钟。
+
+### 步骤 7：等待部署完成
+
+在部署页面，你可以看到实时日志。等待直到看到：
+```
+==> Your service is live 🎉
+```
+
+### 步骤 8：获取 API 地址
+
+部署成功后，页面顶部会显示你的服务 URL，例如：
 ```
 https://paper-interpreter-api-xxxx.onrender.com
 ```
 
-### 步骤 5：验证部署
+### 步骤 9：验证部署
 
 在浏览器中访问：
 ```
@@ -61,46 +86,7 @@ https://paper-interpreter-api-xxxx.onrender.com/api/health
 {"status": "ok", "version": "2.0.0"}
 ```
 
----
-
-## 方式二：手动创建 Web Service
-
-如果你不想使用蓝图，可以手动创建服务。
-
-### 步骤 1：创建 Web Service
-
-1. 登录 [Render Dashboard](https://dashboard.render.com)
-2. 点击 **New** → **Web Service**
-3. 连接你的 GitHub 仓库
-4. 配置服务：
-   - **Name**: `paper-interpreter-api`
-   - **Environment**: `Docker`
-   - **Region**: 选择离你最近的区域
-   - **Branch**: `main`
-   - **Dockerfile Path**: `./paper-interpreter/Dockerfile`
-   - **Docker Context**: `./paper-interpreter`
-
-### 步骤 2：配置环境变量
-
-在 **Environment Variables** 部分添加：
-
-| Key | Value |
-|-----|-------|
-| `GEMINI_API_KEY` | 你的云雾 AI API Key |
-| `NANO_BANANA_API_KEY` | 同上 |
-| `GEMINI_API_URL` | `https://yunwu.ai` |
-| `NANO_BANANA_API_URL` | `https://yunwu.ai` |
-| `GEMINI_MODEL` | `gemini-flash-lite-latest` |
-| `NANO_BANANA_MODEL` | `gemini-3-pro-image-preview` |
-| `ILLUSTRATION_COUNT` | `5` |
-
-### 步骤 3：配置健康检查
-
-- **Health Check Path**: `/api/health`
-
-### 步骤 4：部署
-
-点击 **Create Web Service**，Render 会自动构建并部署你的应用。
+如果看到这个响应，说明部署成功！🎉
 
 ---
 
