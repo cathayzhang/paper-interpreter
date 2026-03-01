@@ -18,7 +18,7 @@ from paper_to_popsci.core.extractor import PDFExtractor
 from paper_to_popsci.core.analyzer import ContentAnalyzer
 from paper_to_popsci.core.illustrator import IllustrationGenerator
 from paper_to_popsci.core.writer import ArticleWriter
-from paper_to_popsci.core.renderer import HTMLRenderer, PDFRenderer
+from paper_to_popsci.core.renderer import HTMLRenderer, PDFExporter
 from paper_to_popsci.core.config import Config
 from paper_to_popsci.core.logger import logger
 
@@ -102,23 +102,33 @@ def process_paper_task(task_id: str, url: str, illustration_count: int):
             renderer = HTMLRenderer()
             html_content = renderer.render(article_sections, paper_content)
             html_path = output_dir / "article.html"
-            renderer.save(html_content, html_path)
+            with open(html_path, 'w', encoding='utf-8') as f:
+                f.write(html_content)
 
-            # Step 7: 导出 PDF
+            # Step 7: 导出 PDF（可选，如果失败不影响主流程）
             tasks[task_id]["progress"] = 95
-            pdf_renderer = PDFRenderer()
             pdf_path = output_dir / "article.pdf"
-            pdf_renderer.render(html_content, pdf_path, output_dir)
+            pdf_url = None
+            try:
+                pdf_exporter = PDFExporter()
+                pdf_exporter.export(html_path, pdf_path)
+                pdf_url = f"/download/{task_id}/article.pdf"
+                logger.info("PDF 导出成功")
+            except Exception as e:
+                logger.warning(f"PDF 导出失败（不影响主流程）: {e}")
+                # PDF 导出失败不影响整体任务
 
             # 保存结果到持久存储（如 S3）
             tasks[task_id]["progress"] = 100
             tasks[task_id]["status"] = "completed"
-            tasks[task_id]["result"] = {
+            result = {
                 "paper_title": paper_content.title,
                 "html_url": f"/download/{task_id}/article.html",
-                "pdf_url": f"/download/{task_id}/article.pdf",
                 "illustration_count": len([i for i in illustrations if i.get("success")]),
             }
+            if pdf_url:
+                result["pdf_url"] = pdf_url
+            tasks[task_id]["result"] = result
 
     except Exception as e:
         logger.error(f"任务处理失败: {e}")
