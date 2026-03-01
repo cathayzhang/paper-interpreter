@@ -6,7 +6,7 @@ import re
 from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
 
-from .config import Config
+from .config import Config, normalize_path
 from .logger import logger
 from .llm_client import LLMClient
 from .paper_recommender import PaperRecommender
@@ -57,7 +57,7 @@ class ArticleWriter:
         for ill in illustrations:
             section = ill.get("section", "unknown")
             success = ill.get("success", False)
-            filepath = ill.get("filepath")
+            filepath = normalize_path(ill.get("filepath"))
             logger.info(f"处理配图: section={section}, success={success}, filepath={filepath}")
             if success and filepath:
                 # 映射特殊情况：comparison -> results

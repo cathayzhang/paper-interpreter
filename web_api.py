@@ -19,7 +19,7 @@ from paper_to_popsci.core.analyzer import ContentAnalyzer
 from paper_to_popsci.core.illustrator import IllustrationGenerator
 from paper_to_popsci.core.writer import ArticleWriter
 from paper_to_popsci.core.renderer import HTMLRenderer, PDFExporter
-from paper_to_popsci.core.config import Config
+from paper_to_popsci.core.config import Config, normalize_path
 from paper_to_popsci.core.logger import logger
 
 app = FastAPI(

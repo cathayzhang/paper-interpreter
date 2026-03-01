@@ -9,7 +9,7 @@ import base64
 from pathlib import Path
 from typing import List, Optional
 
-from .config import Config
+from .config import Config, normalize_path
 from .logger import logger
 
 
@@ -44,6 +44,9 @@ class HTMLRenderer:
 
     def _image_to_base64(self, image_path: str) -> str:
         """将图片转换为 base64 编码"""
+        image_path = normalize_path(image_path)
+        if not image_path:
+            return ""
         try:
             with open(image_path, "rb") as f:
                 image_data = f.read()
@@ -101,7 +104,7 @@ class HTMLRenderer:
         section_type = section.section_type
         title = section.title
         content = section.content
-        image_path = section.image_path
+        image_path = normalize_path(section.image_path) if getattr(section, "image_path", None) else None
 
         if section_type == "hero":
             return self._render_hero(title, content, image_path)

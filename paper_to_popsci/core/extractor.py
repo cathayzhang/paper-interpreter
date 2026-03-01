@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional
 from dataclasses import dataclass, field
 
-from .config import Config
+from .config import Config, normalize_path
 from .logger import logger
 
 
@@ -53,6 +53,10 @@ class PDFExtractor:
         Returns:
             PaperContent: 论文内容对象
         """
+        raw = normalize_path(pdf_path)
+        pdf_path = Path(raw) if raw else None
+        if not pdf_path or not pdf_path.exists():
+            raise ValueError("无效的 PDF 路径")
         logger.info(f"开始提取 PDF 内容: {pdf_path}")
 
         content = PaperContent()

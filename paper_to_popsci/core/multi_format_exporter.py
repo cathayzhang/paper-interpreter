@@ -7,7 +7,7 @@ import re
 from pathlib import Path
 from typing import List, Optional, Dict, Any
 from io import BytesIO
-from .config import Config
+from .config import Config, normalize_path
 from .logger import logger
 
 
@@ -141,7 +141,7 @@ class MultiFormatExporter:
             section_type = section.section_type
             title = section.title
             content = section.content
-            image_path = section.image_path
+            image_path = normalize_path(section.image_path) if getattr(section, "image_path", None) else None
 
             if section_type == "hero":
                 self._add_hero_to_docx(doc, title, content, image_path)
@@ -762,7 +762,7 @@ class MultiFormatExporter:
             section_type = section.section_type
             title = section.title
             content = section.content
-            image_path = section.image_path
+            image_path = normalize_path(section.image_path) if getattr(section, "image_path", None) else None
 
             if section_type == "hero":
                 # Hero 区特殊处理
@@ -799,6 +799,7 @@ class MultiFormatExporter:
                 md_content.append("")
 
             # 添加图片（base64 嵌入）
+            image_path = normalize_path(image_path)
             if image_path and Path(image_path).exists():
                 try:
                     base64_img = self._image_to_base64(image_path)
@@ -837,6 +838,9 @@ class MultiFormatExporter:
 
     def _image_to_base64(self, image_path: str) -> str:
         """将图片转换为 base64"""
+        image_path = normalize_path(image_path)
+        if not image_path:
+            return ""
         try:
             with open(image_path, "rb") as f:
                 image_data = f.read()

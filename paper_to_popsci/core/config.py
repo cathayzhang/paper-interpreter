@@ -47,3 +47,14 @@ class Config:
         """确保必要的目录存在"""
         Path(cls.OUTPUT_DIR).mkdir(parents=True, exist_ok=True)
         Path(cls.TEMP_DIR).mkdir(parents=True, exist_ok=True)
+
+
+def normalize_path(path) -> Optional[str]:
+    """Ensure a path-like value is str for open()/Path(); avoid passing tuple."""
+    if path is None:
+        return None
+    if isinstance(path, (list, tuple)):
+        path = path[0] if path else None
+    if path is None:
+        return None
+    return str(path)
