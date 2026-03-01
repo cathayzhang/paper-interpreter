@@ -13,8 +13,8 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY requirements-full.txt .
+RUN pip install --no-cache-dir -r requirements-full.txt
 
 # Download Playwright browsers (for PDF export fallback)
 RUN playwright install chromium

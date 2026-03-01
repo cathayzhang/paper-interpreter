@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: paper-interpreter-api
+    env: docker
+    dockerfilePath: ./paper-interpreter/Dockerfile
+    dockerContext: ./paper-interpreter
+    plan: free
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_API_URL
+        value: https://yunwu.ai
+      - key: GEMINI_MODEL
+        value: gemini-flash-lite-latest
+      - key: NANO_BANANA_API_URL
+        value: https://yunwu.ai
+      - key: NANO_BANANA_MODEL
+        value: gemini-3-pro-image-preview
+      - key: ILLUSTRATION_COUNT
+        value: 5
+    healthCheckPath: /api/health
