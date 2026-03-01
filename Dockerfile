@@ -2,8 +2,8 @@ FROM python:3.10-slim
 
 WORKDIR /app
 
-# Install system dependencies for WeasyPrint
-RUN apt-get update && apt-get install -y \
+# Install minimal system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libffi-dev \
     libpango-1.0-0 \
@@ -12,12 +12,12 @@ RUN apt-get update && apt-get install -y \
     libcairo2 \
     libxml2 \
     fonts-dejavu-core \
-    fonts-wqy-microhei \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy and install Python dependencies (lightweight for Render)
+# Copy requirements and install Python packages
 COPY requirements-render.txt .
-RUN pip install --no-cache-dir -r requirements-render.txt
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements-render.txt
 
 # Copy application code
 COPY . .

@@ -1,25 +1,21 @@
-# Render 部署依赖 - 轻量级版本
-# 移除了 Playwright 和其他重量级依赖
+# Render 部署依赖 - 最小化版本
+# 只包含 API 运行的核心依赖
 
 # 核心依赖
 requests>=2.31.0
 python-dotenv>=1.0.0
 
-# PDF 处理
+# PDF 处理（最小化）
 PyPDF2>=3.0.0
-pikepdf>=8.0.0
 
 # 图像处理
 Pillow>=10.0.0
-
-# HTML/PDF 导出 (只使用 WeasyPrint)
-weasyprint>=60.0
-
-# 工具库
-tqdm>=4.66.0
-lxml>=4.9.0
 
 # Web API 依赖
 fastapi>=0.104.0
 uvicorn[standard]>=0.24.0
 python-multipart>=0.0.6
+pydantic>=2.0.0
+
+# 工具库
+tqdm>=4.66.0
