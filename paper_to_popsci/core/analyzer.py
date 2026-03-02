@@ -77,17 +77,40 @@ class ContentAnalyzer:
             # 返回默认大纲
             return self._get_default_outline(paper_content)
 
-    def generate_illustration_prompts(self, outline: ArticleOutline, paper_content) -> List[IllustrationPrompt]:
+    def generate_illustration_prompts(self, outline: ArticleOutline, paper_content=None) -> List[IllustrationPrompt]:
         """
         Public alias for _generate_illustration_prompts（兼容旧调用或外部直接调用）
 
         Args:
             outline: 文章大纲对象
-            paper_content: 论文内容对象
+            paper_content: 论文内容对象（可选，如果为 None 则从 outline 构造最小对象）
 
         Returns:
             配图提示词列表
         """
+        # 如果 paper_content 为 None，从 outline 构造最小的 paper_content
+        if paper_content is None:
+            from .extractor import PaperContent
+            
+            # 从 outline 提取信息构造最小 paper_content
+            title = ""
+            abstract = ""
+            
+            # 尝试从 outline 的 sections 中提取标题
+            if hasattr(outline, 'sections') and outline.sections:
+                hero_section = next((s for s in outline.sections if s.get("type") == "hero"), None)
+                if hero_section:
+                    title = hero_section.get("title", "")
+            
+            # 使用 core_innovation 作为摘要
+            if hasattr(outline, 'core_innovation'):
+                abstract = outline.core_innovation
+            
+            paper_content = PaperContent(
+                title=title or "论文解读",
+                abstract=abstract or "本文介绍了一项技术创新"
+            )
+        
         return self._generate_illustration_prompts(outline, paper_content)
 
 
