@@ -6,6 +6,7 @@ import re
 import subprocess
 import shutil
 import base64
+import tempfile
 from pathlib import Path
 from typing import List, Optional
 
@@ -19,18 +20,31 @@ class HTMLRenderer:
     def __init__(self):
         self.style = Config.STYLE
 
-    def render(self, article_sections, paper_content, output_path: Path) -> Path:
+    def render(self, article_sections, paper_content, output_path: Optional[Path] = None) -> Path:
         """
         渲染文章为 HTML
 
         Args:
             article_sections: 文章章节列表
             paper_content: 论文内容对象
-            output_path: 输出 HTML 路径
+            output_path: 输出 HTML 路径（可选，如果为 None 则创建临时文件）
 
         Returns:
             HTML 文件路径
         """
+        # 如果没有提供 output_path，创建临时文件
+        if output_path is None:
+            # 使用 NamedTemporaryFile 创建临时文件
+            temp_file = tempfile.NamedTemporaryFile(
+                mode='w',
+                suffix='.html',
+                prefix='article_',
+                delete=False,
+                encoding='utf-8'
+            )
+            output_path = Path(temp_file.name)
+            temp_file.close()
+        
         logger.info(f"渲染 HTML: {output_path}")
 
         html_content = self._build_html(article_sections, paper_content)
