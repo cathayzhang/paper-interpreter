@@ -36,6 +36,26 @@ class ContentAnalyzer:
     def __init__(self):
         self.llm = LLMClient()
 
+    def _ensure_outline(self, outline) -> ArticleOutline:
+        """
+        接受 ArticleOutline 或 dict（如来自 JSON/API），统一为 ArticleOutline。
+
+        Args:
+            outline: ArticleOutline 对象或 dict
+
+        Returns:
+            ArticleOutline 对象
+        """
+        if isinstance(outline, dict):
+            return ArticleOutline(
+                article_type=outline.get("article_type", "技术创新"),
+                core_innovation=outline.get("core_innovation", ""),
+                analogy_theme=outline.get("analogy_theme", "日常生活"),
+                sections=outline.get("sections", [])
+            )
+        return outline
+
+
     def analyze(self, paper_content) -> Dict[str, Any]:
         """
         分析论文内容
@@ -79,15 +99,18 @@ class ContentAnalyzer:
 
     def generate_illustration_prompts(self, outline: ArticleOutline, paper_content=None) -> List[IllustrationPrompt]:
         """
-        Public alias for _generate_illustration_prompts（兼容旧调用或外部直接调用）
+        Public alias for _generate_illustration_prompts（兼容旧调用：仅传 outline 时用 outline 构造最小 paper_content）。
 
         Args:
-            outline: 文章大纲对象
+            outline: 文章大纲对象（可以是 ArticleOutline 或 dict）
             paper_content: 论文内容对象（可选，如果为 None 则从 outline 构造最小对象）
 
         Returns:
             配图提示词列表
         """
+        # 确保 outline 是 ArticleOutline 对象（而不是 dict）
+        outline = self._ensure_outline(outline)
+        
         # 如果 paper_content 为 None，从 outline 构造最小的 paper_content
         if paper_content is None:
             from .extractor import PaperContent
@@ -244,6 +267,9 @@ class ContentAnalyzer:
 
     def _generate_illustration_prompts(self, outline: ArticleOutline, paper_content) -> List[IllustrationPrompt]:
         """生成配图提示词 - 生成有意义的中文技术图表"""
+        # 确保 outline 是 ArticleOutline 对象（而不是 dict）
+        outline = self._ensure_outline(outline)
+        
         prompts = []
 
         # 从论文内容提取技术细节
