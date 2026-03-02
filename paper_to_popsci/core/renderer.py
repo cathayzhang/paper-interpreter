@@ -49,6 +49,10 @@ class HTMLRenderer:
 
         html_content = self._build_html(article_sections, paper_content)
 
+        # Ensure we always write str (avoid write() argument must be str, not PosixPath)
+        if not isinstance(html_content, str):
+            html_content = str(html_content)
+
         output_path.parent.mkdir(parents=True, exist_ok=True)
         with open(output_path, "w", encoding="utf-8") as f:
             f.write(html_content)
