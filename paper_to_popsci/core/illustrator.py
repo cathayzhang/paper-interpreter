@@ -18,6 +18,28 @@ class IllustrationGenerator:
     def __init__(self):
         self.client = ImageGeneratorClient()
 
+    def _normalize_prompt_data(self, prompt_data) -> Dict[str, Any]:
+        """
+        将 prompt_data 规范化为 dict。
+
+        Args:
+            prompt_data: 可以是 dict 或 IllustrationPrompt 对象
+
+        Returns:
+            dict 格式的 prompt_data
+        """
+        if isinstance(prompt_data, dict):
+            return prompt_data
+
+        # 如果是对象，提取属性
+        return {
+            "section": getattr(prompt_data, "section", "unknown"),
+            "prompt": getattr(prompt_data, "prompt", ""),
+            "style": getattr(prompt_data, "style", ""),
+            "negative_prompt": getattr(prompt_data, "negative_prompt", "")
+        }
+
+
     def generate_all(
         self,
         prompts: List[Dict[str, Any]],
@@ -61,6 +83,9 @@ class IllustrationGenerator:
         index: int
     ) -> Dict[str, Any]:
         """生成单张配图"""
+        # 规范化 prompt_data（支持 dict 或 IllustrationPrompt 对象）
+        prompt_data = self._normalize_prompt_data(prompt_data)
+        
         section = prompt_data.get("section", "unknown")
         prompt = prompt_data.get("prompt", "")
         style = prompt_data.get("style", "")
