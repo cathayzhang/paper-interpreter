@@ -77,6 +77,20 @@ class ContentAnalyzer:
             # 返回默认大纲
             return self._get_default_outline(paper_content)
 
+    def generate_illustration_prompts(self, outline: ArticleOutline, paper_content) -> List[IllustrationPrompt]:
+        """
+        Public alias for _generate_illustration_prompts（兼容旧调用或外部直接调用）
+
+        Args:
+            outline: 文章大纲对象
+            paper_content: 论文内容对象
+
+        Returns:
+            配图提示词列表
+        """
+        return self._generate_illustration_prompts(outline, paper_content)
+
+
     def _build_analysis_prompt(self, paper_content) -> str:
         """构建分析提示"""
         title = paper_content.title or "未知标题"
