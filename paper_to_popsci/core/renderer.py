@@ -63,15 +63,27 @@ class HTMLRenderer:
     def _image_to_base64(self, image_path: str) -> str:
         """将图片转换为 base64 编码"""
         image_path = normalize_path(image_path)
+        logger.info(f"尝试转换图片为 base64: {image_path}")
         if not image_path:
+            logger.warning("图片路径为空")
             return ""
         try:
+            path_obj = Path(image_path)
+            if not path_obj.exists():
+                logger.warning(f"图片文件不存在: {image_path}")
+                return ""
+            
             with open(image_path, "rb") as f:
                 image_data = f.read()
+            
+            if not image_data:
+                logger.warning(f"图片文件为空: {image_path}")
+                return ""
+            
             base64_data = base64.b64encode(image_data).decode('utf-8')
             
             # 检测图片格式
-            ext = Path(image_path).suffix.lower()
+            ext = path_obj.suffix.lower()
             mime_type = {
                 '.png': 'image/png',
                 '.jpg': 'image/jpeg',
@@ -80,9 +92,10 @@ class HTMLRenderer:
                 '.webp': 'image/webp'
             }.get(ext, 'image/png')
             
+            logger.info(f"图片转换成功: {image_path}, 大小: {len(image_data)} 字节, MIME: {mime_type}")
             return f"data:{mime_type};base64,{base64_data}"
         except Exception as e:
-            logger.warning(f"图片转换失败: {e}")
+            logger.warning(f"图片转换失败 {image_path}: {e}")
             return ""
 
     def _build_html(self, article_sections, paper_content) -> str:
@@ -123,6 +136,10 @@ class HTMLRenderer:
         title = section.title
         content = section.content
         image_path = normalize_path(section.image_path) if getattr(section, "image_path", None) else None
+        
+        logger.info(f"渲染章节: type={section_type}, title={title}, has_image={image_path is not None}")
+        if image_path:
+            logger.info(f"章节 '{section_type}' 的图片路径: {image_path}")
 
         if section_type == "hero":
             return self._render_hero(title, content, image_path)

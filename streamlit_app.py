@@ -336,29 +336,51 @@ def process_paper(url: str, illustration_count: int):
 
             progress_bar.progress(80)
 
-            # Step 6: 渲染 HTML
+            # Step 6: 创建最终输出目录并复制图片
+            status_text.text("📁 正在准备输出目录...")
+            timestamp = time.strftime("%Y%m%d_%H%M%S")
+            safe_title = "".join(c for c in paper_content.title if c.isalnum() or c in (' ', '-', '_')).strip()
+            safe_title = safe_title[:50]
+            base_name = f"{safe_title}_{timestamp}" if safe_title else f"paper_{timestamp}"
+            
+            final_output_dir = Path("paper_outputs") / base_name
+            final_output_dir.mkdir(parents=True, exist_ok=True)
+            final_images_dir = final_output_dir / "assets" / "images"
+            final_images_dir.mkdir(parents=True, exist_ok=True)
+            
+            # 复制图片到最终目录并更新路径
+            import shutil
+            for section in article_sections:
+                if hasattr(section, 'image_path') and section.image_path:
+                    old_path = Path(section.image_path)
+                    if old_path.exists():
+                        new_path = final_images_dir / old_path.name
+                        shutil.copy2(old_path, new_path)
+                        section.image_path = str(new_path)
+                        logger.info(f"图片已复制: {old_path.name} -> {new_path}")
+            
+            progress_bar.progress(75)
+
+            # Step 7: 渲染 HTML
             status_text.text("🎨 正在渲染页面...")
             renderer = HTMLRenderer()
-            html_path = output_dir / "article.html"
+            html_path = final_output_dir / "article.html"
             renderer.render(article_sections, paper_content, html_path)
-            progress_bar.progress(90)
+            progress_bar.progress(85)
 
-            # Step 7: 导出多格式
+            # Step 8: 导出多格式
             status_text.text("📦 正在导出多种格式...")
             exporter = MultiFormatExporter()
             export_results = exporter.export(
                 article_sections,
                 paper_content,
-                output_dir,
+                final_output_dir,
                 formats=['html', 'pdf', 'docx', 'md']
             )
             progress_bar.progress(100)
 
             # 读取文件内容到内存
-            timestamp = time.strftime("%Y%m%d_%H%M%S")
-            safe_title = "".join(c for c in paper_content.title if c.isalnum() or c in (' ', '-', '_')).strip()
-            safe_title = safe_title[:50]
-            base_name = f"{safe_title}_{timestamp}" if safe_title else f"paper_{timestamp}"
+            # base_name 已经在上面定义了
 
             # 读取配图为字节并保存
             illustrations_with_bytes = []
