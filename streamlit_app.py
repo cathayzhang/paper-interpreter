@@ -261,6 +261,12 @@ def show_input_page():
         if not url:
             st.error("请输入论文链接")
             return
+        
+        # 验证URL格式
+        url = url.strip()
+        if not url.startswith(('http://', 'https://')):
+            st.error("❌ 请输入有效的URL（必须以 http:// 或 https:// 开头）")
+            return
 
         api_key = os.getenv("GEMINI_API_KEY", st.secrets.get("GEMINI_API_KEY", ""))
         if not api_key:
@@ -272,6 +278,16 @@ def show_input_page():
 
 def process_paper(url: str, illustration_count: int):
     """处理论文"""
+    # 验证URL格式
+    if not url or not isinstance(url, str):
+        st.error("❌ 无效的URL")
+        return
+    
+    url = url.strip()
+    if not url.startswith(('http://', 'https://')):
+        st.error("❌ URL必须以 http:// 或 https:// 开头")
+        return
+    
     progress_bar = st.progress(0)
     status_text = st.empty()
 
@@ -575,14 +591,27 @@ def check_interpret_url():
 
     # 处理旧的interpret_url参数（向后兼容）
     if "interpret_url" in query_params:
-        encoded_url = query_params["interpret_url"]
-        # 解码URL
-        actual_url = encoded_url.replace('%2F', '/').replace('%3A', ':')
-        # 清空查询参数
-        st.query_params.clear()
-        # 设置URL并开始解读
-        st.session_state.paper_url = actual_url
-        return actual_url
+        try:
+            encoded_url = query_params["interpret_url"]
+            # 解码URL
+            import urllib.parse
+            actual_url = urllib.parse.unquote(encoded_url)
+            
+            # 验证URL格式
+            if not actual_url.startswith(('http://', 'https://')):
+                logger.warning(f"无效的URL格式: {actual_url}")
+                st.query_params.clear()
+                return None
+            
+            # 清空查询参数
+            st.query_params.clear()
+            # 设置URL并开始解读
+            st.session_state.paper_url = actual_url
+            return actual_url
+        except Exception as e:
+            logger.error(f"URL解析失败: {e}")
+            st.query_params.clear()
+            return None
 
     return None
 
