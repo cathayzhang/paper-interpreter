@@ -18,6 +18,8 @@ class LLMClient:
         self.api_key = Config.GEMINI_API_KEY
         self.model = Config.GEMINI_MODEL
         self.base_url = Config.GEMINI_API_URL
+        self._last_request_time = 0  # 记录上次请求时间
+        self._min_request_interval = 2  # 最小请求间隔(秒)
 
     def generate(
         self,
@@ -38,6 +40,16 @@ class LLMClient:
         Returns:
             生成的文本
         """
+        # 速率限制: 确保请求之间有最小间隔
+        current_time = time.time()
+        time_since_last_request = current_time - self._last_request_time
+        if time_since_last_request < self._min_request_interval:
+            wait_time = self._min_request_interval - time_since_last_request
+            logger.debug(f"速率控制: 等待 {wait_time:.1f} 秒...")
+            time.sleep(wait_time)
+        
+        self._last_request_time = time.time()
+        
         # 优先使用 Gemini 原生格式（yunwu.ai 的 OpenAI 格式经常过载）
         try:
             return self._generate_gemini_format(prompt, temperature, max_tokens, system_prompt)
@@ -102,7 +114,16 @@ class LLMClient:
                 else:
                     raise
             except requests.exceptions.HTTPError as e:
-                if e.response.status_code == 503:
+                if e.response.status_code == 429:
+                    logger.warning(f"速率限制 (429) - 尝试 {attempt + 1}/{Config.MAX_RETRIES}")
+                    if attempt < Config.MAX_RETRIES - 1:
+                        # 429 错误需要更长的等待时间
+                        wait_time = min(2 ** (attempt + 2), 60)  # 最多等60秒
+                        logger.info(f"等待 {wait_time} 秒后重试...")
+                        time.sleep(wait_time)
+                    else:
+                        raise RuntimeError("API 速率限制,请稍后再试或联系 yunwu.ai 客服提升配额")
+                elif e.response.status_code == 503:
                     logger.warning(f"API 服务暂时不可用 (503) - 尝试 {attempt + 1}/{Config.MAX_RETRIES}")
                     if attempt < Config.MAX_RETRIES - 1:
                         wait_time = 2 ** attempt
@@ -200,7 +221,16 @@ class LLMClient:
                 else:
                     raise
             except requests.exceptions.HTTPError as e:
-                if e.response.status_code == 503:
+                if e.response.status_code == 429:
+                    logger.warning(f"速率限制 (429) - 尝试 {attempt + 1}/{Config.MAX_RETRIES}")
+                    if attempt < Config.MAX_RETRIES - 1:
+                        # 429 错误需要更长的等待时间
+                        wait_time = min(2 ** (attempt + 2), 60)  # 最多等60秒
+                        logger.info(f"等待 {wait_time} 秒后重试...")
+                        time.sleep(wait_time)
+                    else:
+                        raise RuntimeError("API 速率限制,请检查:\n1. yunwu.ai 服务是否过载\n2. 是否触发了速率限制\n3. 考虑稍后再试或联系客服提升配额")
+                elif e.response.status_code == 503:
                     logger.warning(f"API 服务暂时不可用 (503) - 尝试 {attempt + 1}/{Config.MAX_RETRIES}")
                     if attempt < Config.MAX_RETRIES - 1:
                         wait_time = 2 ** attempt
@@ -239,6 +269,8 @@ class ImageGeneratorClient:
         self.api_key = Config.NANO_BANANA_API_KEY
         self.model = Config.NANO_BANANA_MODEL
         self.base_url = Config.NANO_BANANA_API_URL
+        self._last_request_time = 0  # 记录上次请求时间
+        self._min_request_interval = 3  # 图像生成间隔更长(秒)
 
     def generate(
         self,
@@ -261,6 +293,16 @@ class ImageGeneratorClient:
         Returns:
             图像数据 (bytes) 或 None
         """
+        # 速率限制: 确保请求之间有最小间隔
+        current_time = time.time()
+        time_since_last_request = current_time - self._last_request_time
+        if time_since_last_request < self._min_request_interval:
+            wait_time = self._min_request_interval - time_since_last_request
+            logger.debug(f"图像生成速率控制: 等待 {wait_time:.1f} 秒...")
+            time.sleep(wait_time)
+        
+        self._last_request_time = time.time()
+        
         # 尝试使用 OpenAI 图像生成格式
         try:
             return self._generate_openai_image(prompt, width, height)

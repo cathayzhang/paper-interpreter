@@ -27,7 +27,7 @@ class Config:
     MAX_PAPER_SIZE_MB = int(os.getenv("MAX_PAPER_SIZE_MB", "50"))
     CHUNK_SIZE_TOKENS = int(os.getenv("CHUNK_SIZE_TOKENS", "4000"))
     DEFAULT_TIMEOUT_SECONDS = int(os.getenv("DEFAULT_TIMEOUT_SECONDS", "60"))
-    MAX_RETRIES = int(os.getenv("MAX_RETRIES", "5"))
+    MAX_RETRIES = int(os.getenv("MAX_RETRIES", "8"))  # 增加到8次重试
 
     # 配图配置
     ILLUSTRATION_COUNT = int(os.getenv("ILLUSTRATION_COUNT", "5"))
