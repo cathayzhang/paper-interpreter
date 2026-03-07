@@ -15,12 +15,12 @@ class Config:
 
     # API 配置 - Gemini (文本生成)
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
-    GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-flash-lite-latest")
+    GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
     GEMINI_API_URL = os.getenv("GEMINI_API_URL", "https://yunwu.ai")
 
     # API 配置 - Nano Banana (配图生成)
     NANO_BANANA_API_KEY = os.getenv("NANO_BANANA_API_KEY", "")
-    NANO_BANANA_MODEL = os.getenv("NANO_BANANA_MODEL", "gemini-3-pro-image-preview")
+    NANO_BANANA_MODEL = os.getenv("NANO_BANANA_MODEL", "gemini-3.1-flash-image-preview")
     NANO_BANANA_API_URL = os.getenv("NANO_BANANA_API_URL", "https://yunwu.ai")
 
     # 限制配置

@@ -38,12 +38,12 @@ class LLMClient:
         Returns:
             生成的文本
         """
-        # 尝试 OpenAI 兼容格式（大多数代理服务支持）
+        # 优先使用 Gemini 原生格式（yunwu.ai 的 OpenAI 格式经常过载）
         try:
-            return self._generate_openai_format(prompt, temperature, max_tokens, system_prompt)
-        except Exception as e:
-            logger.debug(f"OpenAI 格式失败，尝试 Gemini 原生格式: {e}")
             return self._generate_gemini_format(prompt, temperature, max_tokens, system_prompt)
+        except Exception as e:
+            logger.debug(f"Gemini 格式失败，尝试 OpenAI 兼容格式: {e}")
+            return self._generate_openai_format(prompt, temperature, max_tokens, system_prompt)
 
     def _generate_openai_format(
         self,
