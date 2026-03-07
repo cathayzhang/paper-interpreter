@@ -101,6 +101,21 @@ class LLMClient:
                     time.sleep(2 ** attempt)
                 else:
                     raise
+            except requests.exceptions.HTTPError as e:
+                if e.response.status_code == 503:
+                    logger.warning(f"API 服务暂时不可用 (503) - 尝试 {attempt + 1}/{Config.MAX_RETRIES}")
+                    if attempt < Config.MAX_RETRIES - 1:
+                        wait_time = 2 ** attempt
+                        logger.info(f"等待 {wait_time} 秒后重试...")
+                        time.sleep(wait_time)
+                    else:
+                        raise RuntimeError("API 服务持续不可用,请稍后再试或检查 API Key 是否有效")
+                else:
+                    logger.warning(f"OpenAI 格式请求失败 (尝试 {attempt + 1}): {e}")
+                    if attempt < Config.MAX_RETRIES - 1:
+                        time.sleep(2 ** attempt)
+                    else:
+                        raise
             except Exception as e:
                 logger.warning(f"OpenAI 格式请求失败 (尝试 {attempt + 1}): {e}")
                 if attempt < Config.MAX_RETRIES - 1:
@@ -184,6 +199,21 @@ class LLMClient:
                     time.sleep(2 ** attempt)
                 else:
                     raise
+            except requests.exceptions.HTTPError as e:
+                if e.response.status_code == 503:
+                    logger.warning(f"API 服务暂时不可用 (503) - 尝试 {attempt + 1}/{Config.MAX_RETRIES}")
+                    if attempt < Config.MAX_RETRIES - 1:
+                        wait_time = 2 ** attempt
+                        logger.info(f"等待 {wait_time} 秒后重试...")
+                        time.sleep(wait_time)
+                    else:
+                        raise RuntimeError("API 服务持续不可用,请检查:\n1. yunwu.ai 服务是否正常\n2. API Key 是否有效\n3. 是否触发了速率限制")
+                else:
+                    logger.warning(f"Gemini 格式请求失败 (尝试 {attempt + 1}): {e}")
+                    if attempt < Config.MAX_RETRIES - 1:
+                        time.sleep(2 ** attempt)
+                    else:
+                        raise
             except Exception as e:
                 logger.warning(f"Gemini 格式请求失败 (尝试 {attempt + 1}): {e}")
                 if attempt < Config.MAX_RETRIES - 1:

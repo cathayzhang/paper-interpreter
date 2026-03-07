@@ -160,8 +160,8 @@ class ArticleWriter:
             content = self.llm.generate(prompt, temperature=0.8, max_tokens=800)
             content = self._clean_llm_output(content)
         except Exception as e:
-            logger.warning(f"引言生成失败，使用模板: {e}")
-            content = self._get_default_intro(paper_content, analogy_theme)
+            logger.error(f"引言生成失败: {e}")
+            raise RuntimeError(f"文章生成失败 (引言部分): {str(e)}\n\n请检查 API 服务状态和余额") from e
 
         return ArticleSection(
             section_type="intro",
@@ -198,8 +198,8 @@ class ArticleWriter:
             content = self.llm.generate(prompt, temperature=0.7, max_tokens=1000)
             content = self._clean_llm_output(content)
         except Exception as e:
-            logger.warning(f"问题部分生成失败，使用模板: {e}")
-            content = self._get_default_problem(paper_content, pain_point)
+            logger.error(f"问题部分生成失败: {e}")
+            raise RuntimeError(f"文章生成失败 (问题部分): {str(e)}\n\n请检查 API 服务状态和余额") from e
 
         return ArticleSection(
             section_type="problem",
@@ -214,39 +214,115 @@ class ArticleWriter:
 
         concepts_text = "、".join(key_concepts)
 
-        prompt = f"""请用大白话向"小白"解释论文的核心方法。
+        # 提取更多论文内容用于生成
+        method_content = ""
+        if len(paper_content.sections) > 2:
+            method_content = paper_content.sections[2].content[:2000]
+        else:
+            method_content = paper_content.raw_text[:2000]
+
+        prompt = f"""你是一位擅长科普的技术作家。请用通俗易懂的语言向完全不懂技术的读者解释这篇论文的核心方法。
 
 论文标题: {paper_content.title}
 核心创新: {outline_data.get('core_innovation', '')}
 关键概念: {concepts_text}
 类比主题: {outline_data.get('analogy_theme', '日常生活')}
 
-论文方法章节内容:
-{paper_content.sections[2].content[:1000] if len(paper_content.sections) > 2 else paper_content.raw_text[:1000]}
+论文方法章节原文:
+{method_content}
 
-要求:
-1. 用日常生活类比解释新方法，比如做饭、装修、学骑车等
-2. 专业术语首次出现时，用*术语（大白话解释）*格式，例如：*神经网络（像人脑一样工作的计算程序）*
-3. 分步骤讲解（第一步、第二步、第三步），不要用编号列表
-4. 禁止出现Markdown格式（##、###、- 等）
-5. 禁止出现任何数学公式或LaTeX符号（$、^、_等）
-6. 400-500字，像讲故事一样娓娓道来
-7. 使用第三人称客观叙述
+论文摘要:
+{paper_content.abstract[:500] if paper_content.abstract else ''}
 
-直接输出正文内容。"""
+【重要】写作要求:
+1. 必须深入解释具体的技术方案，不能只说"核心方法"、"关键技术"这种空话
+2. 必须从论文原文中提取具体的方法细节，比如:
+   - 具体的算法步骤或架构设计
+   - 关键的技术组件或模块
+   - 创新点的工作原理
+3. 用生活化类比解释每个关键步骤，比如:
+   - "就像做菜时先备料再炒菜"
+   - "类似于搭积木，先打地基再往上搭"
+4. 禁止使用"首先、其次、最后"这种套话结构
+5. 禁止使用"核心方法"、"关键技术"、"优化算法"这种空洞词汇
+6. 专业术语必须用*术语（通俗解释）*格式，例如: *注意力机制（让模型知道该重点关注哪些信息）*
+7. 禁止出现Markdown格式（##、###、- 、**等）
+8. 禁止出现任何数学公式或LaTeX符号
+9. 400-600字，像给朋友讲解一样自然流畅
+10. 必须让读者看完后能说出"原来是这么做的"
+
+直接输出正文内容，不要标题。"""
 
         try:
-            content = self.llm.generate(prompt, temperature=0.7, max_tokens=1200)
+            content = self.llm.generate(prompt, temperature=0.6, max_tokens=1500)
             content = self._clean_llm_output(content)
+            
+            # 检查生成内容质量
+            if self._is_generic_content(content):
+                logger.warning("检测到空洞内容，重新生成...")
+                # 使用更严格的prompt重试一次
+                retry_prompt = f"""请重新写作，这次必须包含具体技术细节。
+
+论文的方法部分说了什么？请从以下内容中提取关键信息:
+{method_content}
+
+要求:
+- 必须说明具体做了什么（不能只说"提出了新方法"）
+- 必须解释为什么这样做能解决问题
+- 用生活化例子类比每个关键步骤
+- 300-500字，通俗易懂
+
+直接输出正文。"""
+                content = self.llm.generate(retry_prompt, temperature=0.5, max_tokens=1200)
+                content = self._clean_llm_output(content)
+                
         except Exception as e:
-            logger.warning(f"方法部分生成失败，使用模板: {e}")
-            content = self._get_default_method(paper_content, key_concepts)
+            logger.warning(f"方法部分生成失败: {e}")
+            # 尝试从论文内容中提取关键信息作为备用
+            content = self._extract_method_from_paper(paper_content, key_concepts, method_content)
 
         return ArticleSection(
             section_type="method",
             title=title,
             content=content
         )
+    
+    def _is_generic_content(self, content: str) -> bool:
+        """检测内容是否过于空洞"""
+        generic_phrases = [
+            "首先.*其次.*最后",
+            "核心方法.*关键技术",
+            "创新之处.*主要包含",
+            "巧妙地解决.*核心痛点",
+            "优化算法结构",
+            "既实用又优雅"
+        ]
+        
+        for phrase in generic_phrases:
+            if re.search(phrase, content):
+                return True
+        return False
+    
+    def _extract_method_from_paper(self, paper_content, key_concepts, method_content: str) -> str:
+        """从论文中直接提取方法描述（备用方案）"""
+        # 尝试找到方法描述的关键段落
+        paragraphs = method_content.split('\n\n')
+        
+        result = f"这篇论文提出的方法主要围绕{key_concepts[0] if key_concepts else '核心创新'}展开。\n\n"
+        
+        # 选择最有信息量的段落
+        for para in paragraphs[:3]:
+            if len(para) > 100 and any(word in para.lower() for word in ['propose', 'method', 'approach', 'algorithm', 'model', 'architecture']):
+                # 简化学术语言
+                simplified = para.replace('we propose', '研究者提出')
+                simplified = simplified.replace('our method', '这个方法')
+                simplified = simplified.replace('the proposed', '提出的')
+                result += simplified[:300] + "...\n\n"
+                break
+        
+        result += "简单来说，这个方法通过创新的技术设计，在保证效果的同时提升了效率。虽然技术细节较为复杂，但核心思想是让系统能够更智能地处理问题。"
+        
+        return result
 
     def _generate_results(self, section_data: Dict, paper_content) -> ArticleSection:
         """生成结果"""
@@ -289,8 +365,8 @@ class ArticleWriter:
             content = self.llm.generate(prompt, temperature=0.7, max_tokens=800)
             content = self._clean_llm_output(content)
         except Exception as e:
-            logger.warning(f"结果部分生成失败，使用模板: {e}")
-            content = self._get_default_results(all_metrics)
+            logger.error(f"结果部分生成失败: {e}")
+            raise RuntimeError(f"文章生成失败 (结果部分): {str(e)}\n\n请检查 API 服务状态和余额") from e
 
         return ArticleSection(
             section_type="results",
@@ -323,8 +399,8 @@ class ArticleWriter:
             content = self.llm.generate(prompt, temperature=0.8, max_tokens=1000)
             content = self._clean_llm_output(content)
         except Exception as e:
-            logger.warning(f"意义部分生成失败，使用模板: {e}")
-            content = self._get_default_impact(implications)
+            logger.error(f"意义部分生成失败: {e}")
+            raise RuntimeError(f"文章生成失败 (意义部分): {str(e)}\n\n请检查 API 服务状态和余额") from e
 
         return ArticleSection(
             section_type="impact",
@@ -359,8 +435,8 @@ class ArticleWriter:
             content = self.llm.generate(prompt, temperature=0.8, max_tokens=600)
             content = self._clean_llm_output(content)
         except Exception as e:
-            logger.warning(f"总结部分生成失败，使用模板: {e}")
-            content = self._get_default_conclusion(question)
+            logger.error(f"总结部分生成失败: {e}")
+            raise RuntimeError(f"文章生成失败 (总结部分): {str(e)}\n\n请检查 API 服务状态和余额") from e
 
         return ArticleSection(
             section_type="conclusion",
@@ -507,18 +583,6 @@ class ArticleWriter:
 现有的方法虽然在某些场景下表现不错，但在实际应用中往往面临着效率低下、成本高昂等问题。就像用一把钝刀切菜——虽然最终能完成任务，但过程却让人煎熬。
 
 那么，有没有更好的解决方案呢？"""
-
-    def _get_default_method(self, paper_content, key_concepts) -> str:
-        concepts_str = "、".join(key_concepts[:3])
-        return f"""这就是本文的创新之处。研究团队提出了一种全新的思路，主要包含以下几个关键点：
-
-首先，{concepts_str}。这一设计巧妙地解决了传统方法中的核心痛点。
-
-其次，通过优化算法结构，新方法在保证准确性的同时大幅提升了效率。
-
-最后，这种架构还具有很强的通用性，可以应用到各种相关场景中。
-
-可以说，这是一项既实用又优雅的创新。"""
 
     def _get_default_results(self, metrics) -> str:
         if metrics:

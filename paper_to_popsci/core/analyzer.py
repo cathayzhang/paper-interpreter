@@ -94,8 +94,8 @@ class ContentAnalyzer:
 
         except Exception as e:
             logger.error(f"内容分析失败: {e}")
-            # 返回默认大纲
-            return self._get_default_outline(paper_content)
+            # 直接抛出异常,让用户看到真实错误
+            raise RuntimeError(f"论文分析失败: {str(e)}\n\n可能原因:\n1. API 服务不可用 (503错误)\n2. API Key 无效或余额不足\n3. 网络连接问题\n\n请检查:\n- API Key 是否正确\n- 账户余额是否充足\n- yunwu.ai 服务是否正常") from e
 
     def generate_illustration_prompts(self, outline: ArticleOutline, paper_content=None) -> List[IllustrationPrompt]:
         """
@@ -373,29 +373,3 @@ class ContentAnalyzer:
             ))
 
         return prompts
-
-    def _get_default_outline(self, paper_content) -> Dict[str, Any]:
-        """获取默认大纲（分析失败时的降级方案）"""
-        title = paper_content.title or "论文解读"
-
-        outline = ArticleOutline(
-            article_type="技术创新",
-            core_innovation=f"本文介绍了{title}的核心思想",
-            analogy_theme="日常生活",
-            sections=[
-                {"type": "hero", "title": title, "subtitle": "「一项值得关注的技术进展」"},
-                {"type": "intro", "title": "从生活谈起", "analogy": "这项技术与我们的日常生活有着密切的联系"},
-                {"type": "problem", "title": "问题的提出", "pain_point": "现有方法面临效率和准确性的挑战"},
-                {"type": "method", "title": "解决方案", "key_concepts": ["核心方法", "关键技术"]},
-                {"type": "results", "title": "实验结果", "metrics": []},
-                {"type": "impact", "title": "意义与影响", "implications": ["提升效率", "改善体验"]},
-                {"type": "conclusion", "title": "总结与展望", "question": "这项技术将如何改变我们的未来？"}
-            ]
-        )
-
-        illustration_prompts = self._generate_illustration_prompts(outline, paper_content)
-
-        return {
-            "outline": asdict(outline),
-            "illustration_prompts": [asdict(p) for p in illustration_prompts]
-        }
