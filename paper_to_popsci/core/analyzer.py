@@ -78,6 +78,9 @@ class ContentAnalyzer:
                 temperature=0.7,
                 max_tokens=2000
             )
+            
+            # 调试日志: 记录响应的前500字符
+            logger.debug(f"LLM 响应预览: {response[:500]}...")
 
             # 解析响应
             outline = self._parse_outline(response)
@@ -234,12 +237,23 @@ class ContentAnalyzer:
             else:
                 data = json.loads(response)
 
-            return ArticleOutline(
+            outline = ArticleOutline(
                 article_type=data.get("article_type", "技术创新"),
                 core_innovation=data.get("core_innovation", ""),
                 analogy_theme=data.get("analogy_theme", "日常生活"),
                 sections=data.get("sections", [])
             )
+            
+            # 调试日志: 检查 hero 标题
+            hero_section = next((s for s in outline.sections if s.get("type") == "hero"), None)
+            if hero_section:
+                hero_title = hero_section.get("title", "")
+                logger.info(f"Analyzer 生成的标题: {hero_title}")
+                if hero_title == "论文解读" or not hero_title:
+                    logger.warning("⚠️ 标题未转化为科普标题,使用了默认值")
+            
+            return outline
+
         except json.JSONDecodeError as e:
             logger.warning(f"JSON 解析失败: {e}，使用文本解析")
             # 简单的文本解析降级
@@ -247,6 +261,7 @@ class ContentAnalyzer:
 
     def _parse_outline_text(self, response: str) -> ArticleOutline:
         """文本方式解析大纲（降级方案）"""
+        logger.warning("使用文本解析降级方案")
         outline = ArticleOutline()
 
         # 提取类型
@@ -264,9 +279,15 @@ class ContentAnalyzer:
         if analogy_match:
             outline.analogy_theme = analogy_match.group(1).strip()
 
+        # 尝试从响应中提取标题
+        title_match = re.search(r'"title":\s*"([^"]+)"', response)
+        extracted_title = title_match.group(1) if title_match else "论文解读"
+        
+        logger.warning(f"降级方案提取的标题: {extracted_title}")
+
         # 默认章节结构
         outline.sections = [
-            {"type": "hero", "title": "论文解读", "subtitle": "「一项有趣的技术创新」"},
+            {"type": "hero", "title": extracted_title, "subtitle": "「一项有趣的技术创新」"},
             {"type": "intro", "title": "从生活谈起", "analogy": "这项技术和我们的生活息息相关"},
             {"type": "problem", "title": "问题的提出", "pain_point": "现有方法存在局限"},
             {"type": "method", "title": "解决方案", "key_concepts": ["创新点1", "创新点2"]},
