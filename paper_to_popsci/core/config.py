@@ -15,7 +15,7 @@ class Config:
 
     # API 配置 - Gemini (文本生成)
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
-    GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+    GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
     GEMINI_API_URL = os.getenv("GEMINI_API_URL", "https://yunwu.ai")
 
     # API 配置 - Nano Banana (配图生成)
