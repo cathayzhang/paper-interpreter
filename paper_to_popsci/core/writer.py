@@ -157,7 +157,7 @@ class ArticleWriter:
 直接输出正文内容，不要加标题。"""
 
         try:
-            content = self.llm.generate(prompt, temperature=0.8, max_tokens=800)
+            content = self.llm.generate(prompt, temperature=0.8, max_tokens=1200)
             content = self._clean_llm_output(content)
         except Exception as e:
             logger.error(f"引言生成失败: {e}")
@@ -195,7 +195,7 @@ class ArticleWriter:
 直接输出正文内容。"""
 
         try:
-            content = self.llm.generate(prompt, temperature=0.7, max_tokens=1000)
+            content = self.llm.generate(prompt, temperature=0.7, max_tokens=1500)
             content = self._clean_llm_output(content)
         except Exception as e:
             logger.error(f"问题部分生成失败: {e}")
@@ -362,7 +362,7 @@ class ArticleWriter:
 直接输出正文内容。"""
 
         try:
-            content = self.llm.generate(prompt, temperature=0.7, max_tokens=800)
+            content = self.llm.generate(prompt, temperature=0.7, max_tokens=1200)
             content = self._clean_llm_output(content)
         except Exception as e:
             logger.error(f"结果部分生成失败: {e}")
@@ -396,7 +396,7 @@ class ArticleWriter:
 直接输出正文内容。"""
 
         try:
-            content = self.llm.generate(prompt, temperature=0.8, max_tokens=1000)
+            content = self.llm.generate(prompt, temperature=0.8, max_tokens=1500)
             content = self._clean_llm_output(content)
         except Exception as e:
             logger.error(f"意义部分生成失败: {e}")
@@ -432,7 +432,7 @@ class ArticleWriter:
 直接输出正文内容。"""
 
         try:
-            content = self.llm.generate(prompt, temperature=0.8, max_tokens=600)
+            content = self.llm.generate(prompt, temperature=0.8, max_tokens=800)
             content = self._clean_llm_output(content)
         except Exception as e:
             logger.error(f"总结部分生成失败: {e}")
