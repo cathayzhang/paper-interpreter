@@ -100,9 +100,9 @@ class PDFExtractor:
             # 分区提取
             elements = partition_pdf(
                 str(pdf_path),
-                strategy="hi_res",  # 高质量策略
-                include_page_breaks=True,
-                infer_table_structure=True,
+                strategy="fast",  # 使用快速策略，hi_res 依赖 OCR 模型在免费服务器上极慢
+                include_page_breaks=False,
+                infer_table_structure=False,
             )
 
             # 处理元素
