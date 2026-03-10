@@ -38,7 +38,7 @@ class MultiFormatExporter:
         # 首先生成 HTML（基础格式）
         html_path = output_dir / "article.html"
         html_content = self._generate_html(article_sections, paper_content)
-        html_path.write_text(html_content, encoding='utf-8')
+        html_path.write_text(str(html_content), encoding='utf-8')
         results['html'] = html_path
         logger.info(f"HTML 导出成功: {html_path}")
 
@@ -81,18 +81,12 @@ class MultiFormatExporter:
         return results
 
     def _generate_html(self, article_sections, paper_content) -> str:
-        """生成完整 HTML"""
+        """生成完整 HTML（直接调用内部 _build_html，避免临时文件 write 类型问题）"""
         from .renderer import HTMLRenderer
         renderer = HTMLRenderer()
-        # 使用临时文件方式获取HTML内容
-        import tempfile
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.html', delete=False, encoding='utf-8') as f:
-            temp_path = Path(f.name)
-
-        # 渲染到临时文件
-        renderer.render(article_sections, paper_content, temp_path)
-        html_content = temp_path.read_text(encoding='utf-8')
-        temp_path.unlink()
+        html_content = renderer._build_html(article_sections, paper_content)
+        if not isinstance(html_content, str):
+            html_content = str(html_content)
         return html_content
 
     def _export_pdf(self, html_path: Path, output_dir: Path) -> Path:
@@ -815,7 +809,7 @@ class MultiFormatExporter:
 
         # 保存
         md_path = output_dir / "article.md"
-        md_path.write_text('\n'.join(md_content), encoding='utf-8')
+        md_path.write_text('\n'.join(str(c) for c in md_content), encoding='utf-8')
         return md_path
 
     def _clean_markdown_for_md(self, text: str) -> str:
