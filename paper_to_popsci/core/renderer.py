@@ -51,9 +51,11 @@ class HTMLRenderer:
 
         # Ensure we always write str (avoid write() argument must be str, not PosixPath)
         if not isinstance(html_content, str):
+            logger.warning(f"_build_html 返回了非 str 类型: {type(html_content)}，强制转换")
             html_content = str(html_content)
 
         output_path.parent.mkdir(parents=True, exist_ok=True)
+        logger.info(f"写入 HTML 文件，内容类型: {type(html_content).__name__}, 长度: {len(html_content)}")
         with open(output_path, "w", encoding="utf-8") as f:
             f.write(html_content)
 
@@ -104,6 +106,8 @@ class HTMLRenderer:
         body_sections = []
         for section in article_sections:
             html = self._render_section(section)
+            if not isinstance(html, str):
+                html = str(html) if html is not None else ""
             body_sections.append(html)
 
         body_content = "\n".join(body_sections)
